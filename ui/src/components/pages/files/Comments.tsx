@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useState } from 'react';
 import { Button, Card, Col, Form, Pagination, Row } from 'react-bootstrap';
 import AlertBanner, { Severity } from '@components/shared/alerts/AlertBanner';
 
@@ -8,6 +8,8 @@ import { downloadBlob } from '@utilities/download';
 import { getFileDetails } from '@thorpi/files';
 import { downloadAttachment, postFileComments } from '@thorpi/comments';
 import type { Comment } from '@models/files';
+import { useQuery } from '@tanstack/react-query';
+import { queryKeys } from '@thorpi/queryKeys';
 
 // spec: ./files.spec.md
 
@@ -75,25 +77,19 @@ const CommentList = ({
 const Comments = ({ sha256 }: CommentsProps) => {
   const [newComment, setNewComment] = useState('');
   const [filesArray, setFilesArray] = useState<File[]>([]);
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [limit, setLimit] = useState(0);
-  const [maxPage, setMaxPage] = useState(100);
   const [page, setPage] = useState(0);
   const [commentError, setCommentError] = useState('');
   const PAGELIMIT = 10;
 
-  const fetchComments = async () => {
-    const fileDetails = await getFileDetails(sha256, setCommentError);
-    if (fileDetails && fileDetails.comments) {
-      setComments(fileDetails.comments);
-      setMaxPage(Math.ceil(fileDetails.comments.length / PAGELIMIT));
-      setLimit(PAGELIMIT);
-    }
-  };
+  const { data: fileDetails, refetch } = useQuery({
+    queryKey: queryKeys.files.details(sha256),
+    queryFn: () => getFileDetails(sha256),
+    enabled: !!sha256,
+  });
 
-  useEffect(() => {
-    void fetchComments();
-  }, [sha256]);
+  const comments = fileDetails ? fileDetails.comments : [];
+  const maxPage = fileDetails ? Math.ceil(fileDetails.comments.length / PAGELIMIT) : 100;
+  const limit = PAGELIMIT;
 
   // trigger download of a comment attachment via blob URL
   const getAttachment = async (commentID: string, name: string, fileID: string) => {
@@ -118,7 +114,8 @@ const Comments = ({ sha256 }: CommentsProps) => {
       }
       if (await postFileComments(sha256, form, setCommentError)) {
         setCommentError('Success');
-        void fetchComments();
+        void refetch();
+
         const newPageValue = Math.ceil((comments.length + 1) / PAGELIMIT) - 1;
         if (newPageValue != page && newPageValue != -1) {
           setPage(newPageValue);

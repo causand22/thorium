@@ -29,10 +29,9 @@ import FormatToggle from '@components/shared/inputs/code/CodeEditor/FormatToggle
 import ViewModeToggle, { ViewMode } from '@components/shared/inputs/code/CodeEditor/ViewModeToggle';
 import { OverlayTipRight } from '@components/shared/overlay/tips';
 import { useAuth } from '@utilities/auth';
-import { fetchImages, fetchGroups } from '@utilities/fetch';
 import { ImageChecker } from '@utilities/rules/tools/image';
 import { imageToEditorObject, editorObjectToImageCreate } from '@utilities/transforms/image';
-import { createImage } from '@thorpi/images';
+import { createImage, listImageDetails } from '@thorpi/images';
 import type {
   Image,
   ImageArgs,
@@ -45,10 +44,12 @@ import type {
 import { BlankOutputCollection, ImageScaler } from '@models/images';
 import type { Volume } from '@models/volumes';
 import type { OutputCollection as OutputCollectionType } from '@models/results';
-import type { Group } from '@models/groups';
 import { RoleKey } from '@models/users';
 import { getThoriumRole } from '@utilities/role';
 import { FormatType } from '@utilities/rules/types';
+import { useQuery } from '@tanstack/react-query';
+import { listGroupNames } from '@thorpi/groups';
+import { queryKeys } from '@thorpi/queryKeys';
 
 // spec: ./SPEC.md
 
@@ -83,15 +84,11 @@ type EnvValue = Record<string, string | null>;
 const ImageCreate: React.FC = () => {
   const navigate = useNavigate();
   const { state } = useLocation() as { state: Image | null };
-  const { userInfo, checkCookie } = useAuth();
+  const { userInfo } = useAuth();
 
   const [hideAdvanced, setHideAdvanced] = useState(true);
   const [displayErrors, setDisplayErrors] = useState(false);
   const [createImageErrors, setCreateImageErrors] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [groups, setGroups] = useState<string[]>([]);
-  const [images, setImages] = useState<string[]>([]);
-  let cancelUpdate = false;
 
   // Single source of truth: both form and editor views read/write this object
   const [editorObj, setEditorObj] = useState<Record<string, unknown>>(state ? imageToEditorObject(state) : IMAGE_CREATE_TEMPLATE);
@@ -108,6 +105,18 @@ const ImageCreate: React.FC = () => {
 
   const formMode = state ? ImageFormMode.Copy : ImageFormMode.Create;
   const scaler = typeof editorObj.scaler === 'string' ? editorObj.scaler : 'K8s';
+
+  const { data: groups = [] } = useQuery({
+    queryKey: queryKeys.groups.simple,
+    queryFn: () => listGroupNames(null, 1000),
+  });
+
+  const liveGroup = typeof editorObj.group === 'string' ? editorObj.group : '';
+  const { data: images = [], isLoading: loading } = useQuery({
+    queryKey: queryKeys.images.simple(liveGroup),
+    queryFn: () => listImageDetails(liveGroup),
+    enabled: liveGroup != '',
+  });
 
   // Lossless view switching — no confirmation needed since both views share editorObj
   const handleViewModeChange = (mode: ViewMode) => {
@@ -133,18 +142,6 @@ const ImageCreate: React.FC = () => {
       return { ...rest, ...(fields as unknown as Record<string, unknown>) };
     });
   }, []);
-
-  useEffect(() => {
-    void fetchGroups(setGroups as (groups: { [name: string]: Group } | Group[] | string[]) => void, null as never, false);
-  }, []);
-
-  useEffect(() => {
-    const group = typeof editorObj.group === 'string' ? editorObj.group : '';
-    if (group) void fetchImages([group], setImages, cancelUpdate, () => void checkCookie(), setLoading, false);
-    return () => {
-      cancelUpdate = true;
-    };
-  }, [editorObj.group]);
 
   useEffect(() => {
     if (!(imageFieldErrors || volumeErrors || dependencyErrors || outputCollectionErrors || resourceErrors || argErrors)) {
@@ -255,7 +252,7 @@ const ImageCreate: React.FC = () => {
               />
               <hr />
               <Dependencies
-                images={images}
+                images={images.map((img) => img.name)}
                 value={editorObj.dependencies ?? {}}
                 onChange={(deps: DependenciesType) => setEditorObj((prev) => ({ ...prev, dependencies: deps }))}
                 onValidate={setDependencyErrors}

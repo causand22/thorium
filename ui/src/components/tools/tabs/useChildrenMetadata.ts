@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 // project imports
-import { getFileDetails } from '@thorpi/files';
+import { getFileDetailsLegacy } from '@thorpi/files';
 import { useAuth } from '@utilities/auth';
 import { Sample } from '@models/files';
 import { Output } from '@models/results';
@@ -120,7 +120,7 @@ export function useChildrenMetadata(result: Output | undefined, active: boolean)
     const errorHandler = () => void checkCookie();
     await fetchChildrenBatches(
       shas,
-      (sha) => getFileDetails(sha, errorHandler),
+      (sha) => getFileDetailsLegacy(sha, errorHandler),
       (resolved, attempted) => {
         // a version switch nulls startedRef and resets state; a batch from the previous version's
         // in-flight fetch must not merge stale samples or inflate the new version's progress count

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Accordion, Button, Badge, Form, Modal } from 'react-bootstrap';
 import AlertBanner from '@components/shared/alerts/AlertBanner';
 
@@ -15,18 +15,14 @@ import { Clause } from '@components/shared/inputs/omnibar/ClauseTypes';
 import { defaultTimeSelection } from '@components/shared/inputs/omnibar/timepicker/utils';
 import { useOmnibarUrlState } from '@components/shared/inputs/omnibar/useOmnibarUrlState';
 import { getGroupsFromClauses, getStringFieldListFromClauses } from '@components/shared/inputs/omnibar/utils';
-import { getAllGroupUsers, hasOverlap } from '@utilities/groups';
+import { getAllGroupUsers, groupListToRecord, hasOverlap } from '@utilities/groups';
 import { useAuth } from '@utilities/auth';
-import { fetchGroups } from '@utilities/fetch';
-import { listUsers } from '@thorpi/users';
-import { createGroup, getGroup } from '@thorpi/groups';
+import { listUsersSimple } from '@thorpi/users';
+import { createGroup, getGroup, listGroupDetails } from '@thorpi/groups';
 import { type Group } from '@models/groups';
 import GroupInfo from './GroupInfo';
-
-interface CreateGroupProps {
-  setLoading: (next: boolean) => void;
-  setGroups: (next: Record<string, Group>) => void;
-}
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@thorpi/queryKeys';
 
 const filterGroups = (groups: Record<string, Group>, clauses: Clause[]): Record<string, Group> => {
   const clauseGroups = getGroupsFromClauses(clauses);
@@ -49,7 +45,11 @@ const filterGroups = (groups: Record<string, Group>, clauses: Clause[]): Record<
   return Object.fromEntries(e);
 };
 
-const CreateGroup = ({ setGroups, setLoading }: CreateGroupProps) => {
+interface CreateGroupProps {
+  onCreated: () => Promise<void>;
+}
+
+const CreateGroup = ({ onCreated }: CreateGroupProps) => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createError, setCreateError] = useState('');
   const [newGroupName, setNewGroupName] = useState('');
@@ -61,6 +61,22 @@ const CreateGroup = ({ setGroups, setLoading }: CreateGroupProps) => {
     setCreateError('');
   };
   const handleShowCreateModal = () => setShowCreateModal(true);
+
+  const onClickSubmitModal = async () => {
+    if (newGroupName != '') {
+      const groupInfo = {
+        name: newGroupName,
+        description: newGroupDescription,
+      };
+      if (await createGroup(groupInfo, setCreateError)) {
+        await onCreated();
+        void checkCookie();
+        handleCloseCreateModal();
+      }
+    } else {
+      setCreateError('you must specify a group name');
+    }
+  };
 
   return (
     <div>
@@ -99,25 +115,7 @@ const CreateGroup = ({ setGroups, setLoading }: CreateGroupProps) => {
           </Form.Group>
         </Modal.Body>
         <Modal.Footer className="d-flex justify-content-center">
-          <Button
-            className="ok-btn m-1"
-            onClick={() => {
-              void (async () => {
-                if (newGroupName != '') {
-                  const groupInfo = {
-                    name: newGroupName,
-                    description: newGroupDescription,
-                  };
-                  if (await createGroup(groupInfo, setCreateError)) {
-                    void fetchGroups(setGroups as (groups: Record<string, Group> | Group[] | string[]) => void, setLoading, true);
-                    void checkCookie();
-                  }
-                } else {
-                  setCreateError('you must specify a group name');
-                }
-              })();
-            }}
-          >
+          <Button className="ok-btn m-1" onClick={() => void onClickSubmitModal()}>
             Create
           </Button>
         </Modal.Footer>
@@ -127,39 +125,39 @@ const CreateGroup = ({ setGroups, setLoading }: CreateGroupProps) => {
 };
 
 const Groups = () => {
-  const [loading, setLoading] = useState(false);
-  const [groups, setGroups] = useState<Record<string, Group>>({});
-  const [allUsers, setAllUSers] = useState<string[]>([]);
-  // omnibar filters live in the URL so a filtered group list is shareable
   const { clauses, setClauses } = useOmnibarUrlState({ clauses: [], time: defaultTimeSelection() });
   const { userInfo } = useAuth();
 
+  const queryClient = useQueryClient();
+
+  const { data: groupDetails = [], isLoading: groupsLoading } = useQuery({
+    queryKey: queryKeys.groups.details,
+    queryFn: () => listGroupDetails(),
+  });
+
+  const groups = groupListToRecord(groupDetails);
+
+  const { data: allUsers = [], isLoading: usersLoading } = useQuery({
+    queryKey: queryKeys.users.simple,
+    queryFn: async () => (await listUsersSimple(null, 1000)).sort(),
+  });
+
   const filteredGroups = filterGroups(groups, clauses);
-  // get a list of all Thorium users
-  const fetchAllUsers = async () => {
-    const reqUsers = await listUsers(console.log, false);
-    if (reqUsers) {
-      setAllUSers((reqUsers as string[]).sort());
-    }
-  };
+  const loading = groupsLoading || usersLoading;
+
+  const refreshGroups = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: queryKeys.groups.details });
+  }, [queryClient]);
 
   // Refetch a single group and replace just that entry in place. Used after an edit so only the
   // changed group's content rerenders, without reloading the whole list or toggling the page
   // spinner (which keeps every other open accordion untouched).
   const refreshSingleGroup = async (name: string) => {
     const fresh = await getGroup(name, console.log);
-    if (fresh) {
-      setGroups((prev) => ({ ...prev, [name]: fresh }));
-    }
-  };
+    if (!fresh) return;
 
-  // get list of groups and users on initial page load
-  useEffect(() => {
-    // Get group details on page load
-    void fetchGroups(setGroups as (groups: Record<string, Group> | Group[] | string[]) => void, setLoading, true);
-    void fetchAllUsers();
-    // if user info changes, we want to get the group details again
-  }, [userInfo]);
+    queryClient.setQueryData<Group[]>(['groups', 'details'], (prev = []) => prev.map((group) => (group.name === name ? fresh : group)));
+  };
 
   return (
     <Page title="Groups · Thorium">
@@ -176,7 +174,7 @@ const Groups = () => {
         <Title>Groups</Title>
         <div>
           <h2>
-            <CreateGroup setGroups={setGroups} setLoading={setLoading} />
+            <CreateGroup onCreated={refreshGroups} />
           </h2>
         </div>
       </div>
@@ -210,8 +208,7 @@ const Groups = () => {
                   <GroupInfo
                     group={filteredGroups[group]}
                     allUsers={allUsers}
-                    setGroups={setGroups}
-                    setLoading={setLoading}
+                    refreshGroups={refreshGroups}
                     refreshSingleGroup={refreshSingleGroup}
                   />
                 </Accordion.Body>

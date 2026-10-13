@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { Table } from 'react-bootstrap';
 import AlertBanner from '@components/shared/alerts/AlertBanner';
 import styled from 'styled-components';
@@ -8,7 +7,8 @@ import Page from '@components/pages/Page';
 import Subtitle from '@components/shared/titles/Subtitle';
 import Title from '@components/shared/titles/Title';
 import { getSystemSettings } from '@thorpi/system';
-import type { SystemSettings as SystemSettingsType } from '@models/system';
+import { useQuery } from '@tanstack/react-query';
+import { queryKeys } from '@thorpi/queryKeys';
 
 const Settings = styled.div`
   display: flex;
@@ -18,42 +18,33 @@ const Settings = styled.div`
 `;
 
 const SystemSettings = () => {
-  const [getSettingsError, setGetSettingsError] = useState('');
-  const [systemSettings, setSystemSettings] = useState<SystemSettingsType>({});
-
-  // fetch latest settings from API
-  const fetchSettings = async () => {
-    const settings = await getSystemSettings(setGetSettingsError);
-    if (settings) {
-      setSystemSettings(settings);
-    }
-  };
-
-  useEffect(() => {
-    void fetchSettings();
-  }, []);
+  const { data: systemSettings, error } = useQuery({
+    queryKey: queryKeys.system.settings,
+    queryFn: getSystemSettings,
+  });
 
   return (
     <Page title="Settings · Thorium" className="settings">
       <Settings>
-        {getSettingsError != '' && <AlertBanner>{getSettingsError}</AlertBanner>}
+        {error && <AlertBanner>{error.message}</AlertBanner>}
         <Title>System Settings</Title>
         <Table striped bordered hover>
           <tbody>
-            {Object.keys(systemSettings).map((setting) => (
-              <tr key={setting}>
-                <td>
-                  <center>
-                    <Subtitle>{setting}</Subtitle>
-                  </center>
-                </td>
-                <td>
-                  <center>
-                    <Subtitle>{systemSettings[setting].toString()}</Subtitle>
-                  </center>
-                </td>
-              </tr>
-            ))}
+            {systemSettings &&
+              Object.keys(systemSettings).map((setting) => (
+                <tr key={setting}>
+                  <td>
+                    <center>
+                      <Subtitle>{setting}</Subtitle>
+                    </center>
+                  </td>
+                  <td>
+                    <center>
+                      <Subtitle>{systemSettings[setting].toString()}</Subtitle>
+                    </center>
+                  </td>
+                </tr>
+              ))}
           </tbody>
         </Table>
       </Settings>

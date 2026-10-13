@@ -9,28 +9,16 @@ import { OutputMap } from '@models/results';
  * Fetch all tool results for a file (`GET /files/results/{sha256}`).
  *
  * @param sha256 - The SHA256 of the file whose results to fetch.
- * @param errorHandler - Called with a formatted message if the request fails.
- * @param data - Optional axios request config (e.g. `params` to filter by tool/group).
- * @returns The {@link OutputMap} of tool results keyed by tool, or `null` if the request failed.
+ * @returns The {@link OutputMap} of tool results keyed by tool
  */
-export async function getResults(
-  sha256: string,
-  errorHandler: (error: string) => void,
-  data: Record<string, unknown> = {},
-): Promise<OutputMap | null> {
+export async function getResults(sha256: string): Promise<OutputMap> {
   const url = '/files/results/' + sha256;
-  return client
-    .get<OutputMap>(url, data)
-    .then((res) => {
-      if (res?.status == 200 && res.data) {
-        return res.data;
-      }
-      return null;
-    })
-    .catch((error: unknown) => {
-      parseRequestError(error, errorHandler, 'Get Results');
-      return null;
-    });
+  return client.get<OutputMap>(url).then((res) => {
+    if (res?.status == 200 && res.data) {
+      return res.data;
+    }
+    throw new Error('error getting results');
+  });
 }
 
 /**

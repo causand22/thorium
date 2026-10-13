@@ -4,15 +4,13 @@ import AlertBanner, { Severity } from '@components/shared/alerts/AlertBanner';
 // project imports
 const ToolResult = React.lazy(() => import('@components/tools/ToolResult'));
 import LoadingSpinner from '@components/shared/fallback/LoadingSpinner';
-import { useAuth } from '@utilities/auth';
 import { updateURLSection } from '@utilities/url';
 import { scrollToSection } from '@utilities/interactions';
-import { getResults } from '@thorpi/results';
 import { OutputDisplayType, type Output } from '@models/results';
 
 // spec: ./files.spec.md
 
-type ParsedResults = Record<string, Output[]>;
+export type ParsedResults = Record<string, Output[]>;
 
 interface ResultsTableOfContentsProps {
   parsedResults: ParsedResults;
@@ -69,41 +67,14 @@ const ResultsTableOfContents = ({ parsedResults, inViewElements }: ResultsTableO
 
 interface ResultsProps {
   sha256: string;
+  isLoading: boolean;
   results: ParsedResults;
-  setResults: (results: ParsedResults) => void;
-  numResults: number;
-  setNumResults: (num: number) => void;
   allowHashUpdate?: boolean;
 }
 
-const Results = ({ sha256, results, setResults, numResults, setNumResults }: ResultsProps) => {
-  const [loading, setLoading] = useState(false);
+const Results = ({ sha256, isLoading, results }: ResultsProps) => {
   const [inViewElements, setInViewElements] = useState<string[]>([]);
-  const { checkCookie } = useAuth();
-
-  // get results from API
-  useEffect(() => {
-    let isSubscribed = true;
-    const fetchData = async () => {
-      setLoading(true);
-      const resultsRes = await getResults(
-        sha256,
-        () => {
-          void checkCookie();
-        },
-        {},
-      );
-      if (resultsRes && 'results' in resultsRes && isSubscribed) {
-        setNumResults(Object.keys(resultsRes.results).length);
-        setResults(resultsRes.results);
-      }
-      setLoading(false);
-    };
-    void fetchData();
-    return () => {
-      isSubscribed = false;
-    };
-  }, [sha256]);
+  const numResults = Object.keys(results).length;
 
   // update whether an element is in the viewport
   const updateInView = (inView: boolean, entry: string) => {
@@ -125,11 +96,11 @@ const Results = ({ sha256, results, setResults, numResults, setNumResults }: Res
 
   return (
     <div id="results-tab" className="navbar-scroll-offset results-container">
-      <LoadingSpinner loading={loading}></LoadingSpinner>
-      {parsedResults && typeof parsedResults === 'object' && !loading && (
+      <LoadingSpinner loading={isLoading}></LoadingSpinner>
+      {parsedResults && typeof parsedResults === 'object' && !isLoading && (
         <>
           <div>
-            {numResults == 0 && !loading && (
+            {numResults == 0 && !isLoading && (
               <>
                 <br />
                 <AlertBanner severity={Severity.Info}>

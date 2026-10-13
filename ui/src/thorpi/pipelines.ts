@@ -82,46 +82,45 @@ export async function getPipeline(group: string, pipeline: string, errorHandler:
 }
 
 /**
- * List the pipelines in a group, as names or full details (`GET /pipelines/list/{group}/` or `/details/`).
+ * List the pipelines in a group as names
  *
  * @param group - The group whose pipelines to list.
- * @param errorHandler - Called with a formatted message if the request fails.
- * @param details - When `true`, return full {@link Pipeline} objects; when `false`, return pipeline names.
  * @param cursor - Pagination cursor from a previous call, or `null` for the first page.
  * @param limit - Maximum number of pipelines to return per page (defaults to 100).
- * @returns An array of {@link Pipeline} details (when `details`) or names, or `null` if the request failed.
+ * @returns An array of names
  */
-export async function listPipelines(
-  group: string,
-  errorHandler: (error: string) => void,
-  details = false,
-  cursor: string | null = null,
-  limit = 100,
-): Promise<Pipeline[] | string[] | null> {
-  let url = '/pipelines/list/' + group + '/';
-  if (details) {
-    url += 'details/';
+export async function listPipelinesSimple(group: string, cursor: string | null = null, limit = 100): Promise<string[]> {
+  const url = '/pipelines/list/' + group + '/';
+  const params: { limit: number; cursor?: string } = { limit };
+  if (cursor) params.cursor = cursor;
+  const res = await client.get<PipelineListResponse>(url, { params });
+  if (res.status === 200 && res.data) {
+    return res.data.names;
   }
-  const params: { limit: number; cursor?: string } = { limit: limit };
-  if (cursor) {
-    params['cursor'] = cursor;
+  throw new Error('Invalid List Pipelines response');
+}
+
+/**
+ * List the pipelines in a group with full details (`GET /pipelines/list/{group}/details/`).
+ *
+ * @param group - The group whose pipelines to list.
+ * @param cursor - Pagination cursor from a previous call, or `null` for the first page.
+ * @param limit - Maximum number of pipelines to return per page (defaults to 100).
+ * @returns An array of {@link Pipeline} details (when `details`)
+ */
+export async function listPipelinesDetails(group: string, cursor: string | null = null, limit = 100): Promise<Pipeline[]> {
+  const url = `/pipelines/list/${group}/details/`;
+
+  const params: { limit: number; cursor?: string } = { limit };
+  if (cursor) params.cursor = cursor;
+
+  const res = await client.get<PipelineDetailsListResponse>(url, { params });
+
+  if (res.status === 200 && res.data) {
+    return res.data.details;
   }
-  return client
-    .get<PipelineListResponse | PipelineDetailsListResponse>(url, { params: params })
-    .then((res) => {
-      if (res?.status == 200 && res.data) {
-        if (details && 'details' in res.data) {
-          return res.data.details;
-        } else if (!details && 'names' in res.data) {
-          return res.data.names;
-        }
-      }
-      return null;
-    })
-    .catch((error: unknown) => {
-      parseRequestError(error, errorHandler, 'List Pipelines');
-      return null;
-    });
+
+  throw new Error('Invalid List Pipelines response');
 }
 
 /**

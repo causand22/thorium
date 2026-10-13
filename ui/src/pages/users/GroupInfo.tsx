@@ -22,8 +22,7 @@ interface SelectOption {
 interface GroupInfoProps {
   group: Group;
   allUsers: string[];
-  setLoading: (next: boolean) => void;
-  setGroups: (next: Record<string, Group>) => void;
+  refreshGroups: () => Promise<void>;
   refreshSingleGroup: (name: string) => Promise<void>;
 }
 
@@ -32,20 +31,11 @@ interface ModifyGroupButtonsProps {
   admin: boolean;
   groupChanges: GroupUpdate;
   disableUpdate: boolean;
-  setLoading: (next: boolean) => void;
-  setGroups: (next: Record<string, Group>) => void;
+  refreshGroups: () => Promise<void>;
   refreshSingleGroup: (name: string) => Promise<void>;
 }
 
-const ModifyGroupButtons = ({
-  group,
-  admin,
-  groupChanges,
-  disableUpdate,
-  setLoading,
-  setGroups,
-  refreshSingleGroup,
-}: ModifyGroupButtonsProps) => {
+const ModifyGroupButtons = ({ group, admin, groupChanges, disableUpdate, refreshGroups, refreshSingleGroup }: ModifyGroupButtonsProps) => {
   const { userInfo } = useAuth();
   // only owners, managers and Thorium admins can modify a group
   return (
@@ -61,8 +51,8 @@ const ModifyGroupButtons = ({
                 refreshSingleGroup={refreshSingleGroup}
               />
             )}
-            <LeaveGroupButton group={group} username={userInfo?.username || ''} setLoading={setLoading} setGroups={setGroups} />
-            {admin && <DeleteGroupButton group={group} setLoading={setLoading} setGroups={setGroups} />}
+            <LeaveGroupButton group={group} username={userInfo?.username || ''} onSuccess={refreshGroups} />
+            {admin && <DeleteGroupButton group={group} onSuccess={refreshGroups} />}
           </ButtonGroup>
         </ButtonToolbar>
       </Row>
@@ -76,7 +66,7 @@ const managerStyles = createReactSelectStyles('White', 'CornFlowerBlue');
 const userStyles = createReactSelectStyles('White', 'CadetBlue');
 const monitorStyles = createReactSelectStyles('White', 'DimGray');
 
-const GroupInfo = ({ group, allUsers, setGroups, setLoading, refreshSingleGroup }: GroupInfoProps) => {
+const GroupInfo = ({ group, allUsers, refreshGroups, refreshSingleGroup }: GroupInfoProps) => {
   // Owners
   const combinedOwners = 'owners' in group && 'combined' in group.owners ? group.owners.combined.sort() : [];
   const metagroupOwners = 'owners' in group && 'metagroups' in group.owners ? group.owners.metagroups.sort() : [];
@@ -714,8 +704,7 @@ const GroupInfo = ({ group, allUsers, setGroups, setLoading, refreshSingleGroup 
             admin={groupAdmin}
             groupChanges={groupChanges}
             disableUpdate={disableUpdate}
-            setGroups={setGroups}
-            setLoading={setLoading}
+            refreshGroups={refreshGroups}
             refreshSingleGroup={refreshSingleGroup}
           />
         </Row>

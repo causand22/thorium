@@ -78,45 +78,45 @@ export async function getImage(group: string, image: string): Promise<Image | nu
 }
 
 /**
- * List the images in a group, as names or full details (`GET /images/{group}/` or `/details/`).
+ * List the images in a group as names (`GET /images/{group}/`).
  *
  * @param group - The group whose images to list.
- * @param errorHandler - Called with a formatted message if the request fails.
- * @param details - When `true`, return full {@link Image} objects; when `false`, return an {@link ImageList} of names.
  * @param cursor - Pagination cursor from a previous call, or `null` for the first page.
  * @param limit - Maximum number of images to return per page (defaults to 100).
- * @returns An array of {@link Image} details (when `details`) or an {@link ImageList}, or `null` if the request failed.
+ * @returns An array of {@link ImageList}
  */
-export async function listImages(
-  group: string,
-  errorHandler: (error: string) => void,
-  details = false,
-  cursor: string | null = null,
-  limit = 100,
-): Promise<Image[] | ImageList | null> {
-  let url = '/images/' + group + '/';
-  if (details) {
-    url += 'details/';
-  }
+export async function listImagesSimple(group: string, cursor: string | null = null, limit = 100): Promise<ImageList> {
+  const url = '/images/' + group + '/';
+
   const params: { limit: number; cursor?: string } = { limit };
-  if (cursor) {
-    params['cursor'] = cursor;
-  }
-  return client
-    .get<ImageList | ImageDetailsList>(url, { params: params })
-    .then((res) => {
-      if (res?.status == 200 && res.data) {
-        if (details && 'details' in res.data) {
-          return res.data.details;
-        }
-        return res.data as ImageList;
-      }
-      return null;
-    })
-    .catch((error: unknown) => {
-      parseRequestError(error, errorHandler, 'List Images');
-      return null;
-    });
+  if (cursor) params['cursor'] = cursor;
+
+  return client.get<ImageList>(url, { params: params }).then((res) => {
+    if (res?.status === 200 && res.data) {
+      return res.data;
+    }
+    throw new Error('error loading images');
+  });
+}
+
+/**
+ * List the images in a group as full details (`GET /images/{group}/details/`).
+ *
+ * @param group - The group whose images to list.
+ * @param cursor - Pagination cursor from a previous call, or `null` for the first page.
+ * @param limit - Maximum number of images to return per page (defaults to 100).
+ * @returns An array of {@link Image} details (when `details`)
+ */
+export async function listImageDetails(group: string, cursor: string | null = null, limit = 100): Promise<Image[]> {
+  const url = '/images/' + group + '/details/';
+  const params: { limit: number; cursor?: string } = { limit };
+  if (cursor) params['cursor'] = cursor;
+  return client.get<ImageDetailsList>(url, { params: params }).then((res) => {
+    if (res?.status === 200 && res.data) {
+      return res.data.details;
+    }
+    throw new Error('error loading images');
+  });
 }
 
 /**

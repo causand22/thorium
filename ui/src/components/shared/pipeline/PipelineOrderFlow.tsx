@@ -45,7 +45,9 @@ import {
   TERMINAL_OFFSET,
 } from './order';
 import { createReactSelectStyles } from '@utilities/select';
-import { listImages } from '@thorpi/images';
+import { listImagesSimple } from '@thorpi/images';
+import { useQuery } from '@tanstack/react-query';
+import { queryKeys } from '@thorpi/queryKeys';
 
 // spec: ./PipelineOrderFlow.spec.md
 
@@ -366,22 +368,16 @@ const PipelineOrderFlowInner: React.FC<PipelineOrderFlowProps> = ({ order, onOrd
 
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
   const [selectMenu, setSelectMenu] = useState<SelectMenuState>(null);
-  const [groupImages, setGroupImages] = useState<string[]>([]);
   // User-chosen canvas height via the bottom resize handle (null = auto height from parallel count).
   const [userHeight, setUserHeight] = useState<number | null>(null);
 
-  // Fetch images for the group when editing is enabled
-  useEffect(() => {
-    if (!group || !onOrderChange) return;
-    let cancelled = false;
-    void listImages(group, console.error, false, null, 1000).then((result) => {
-      if (cancelled) return;
-      if (result && 'names' in result) setGroupImages(result.names);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [group, onOrderChange]);
+  const { data: imageNames } = useQuery({
+    queryKey: queryKeys.images.simple(group!),
+    queryFn: () => listImagesSimple(group!, null, 1000),
+    enabled: !!group && !!onOrderChange,
+  });
+
+  const groupImages = imageNames?.names ?? [];
 
   // Sync nodes when order prop changes
   useEffect(() => {

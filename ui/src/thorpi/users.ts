@@ -264,6 +264,20 @@ export async function listUsers(
     });
 }
 
+export async function listUsersSimple(cursor: string | null = null, limit = 1000): Promise<string[]> {
+  const url = '/users/';
+  const params: { limit: number; cursor?: string } = { limit };
+  if (cursor) {
+    params['cursor'] = cursor;
+  }
+  return client.get<string[]>(url, { params: params }).then((res) => {
+    if (res?.status == 200 && res.data) {
+      return res.data;
+    }
+    throw new Error('error getting users');
+  });
+}
+
 /**
  * Log the current user out, invalidating their session (`POST /users/logout`).
  *

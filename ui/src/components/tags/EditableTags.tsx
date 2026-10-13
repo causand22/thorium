@@ -13,8 +13,7 @@ import TagBadge from '@components/tags/TagBadge';
 import { FormattedFileInfoTagKeys, TLPLevels } from '@components/tags/tag_groups';
 import { OverlayTipBottom, OverlayTipRight } from '@components/shared/overlay/tips';
 import { createReactSelectStyles } from '@utilities/select';
-import { deleteTags, getFileDetails, uploadTags } from '@thorpi/files';
-import type { Sample } from '@models/files';
+import { deleteTags, uploadTags } from '@thorpi/files';
 import type { TagEntry, Tags, RequestTags } from '@models/tags';
 import { Entities } from '@models/entities/entities';
 import rawAttackTagDefaults from '../../../mitre_tags/attackTagsList.tags?raw';
@@ -31,7 +30,7 @@ interface ThoriumTagSelectOption {
 interface EditableTagsProps {
   sha256: string;
   tags: Tags;
-  setDetails: (details: Sample) => void;
+  onUpdate: () => Promise<void>;
   setUpdateError?: (error: string) => void;
 }
 
@@ -49,7 +48,7 @@ const generalTagStyle = createReactSelectStyles('White', 'rgb(160, 162, 163)');
 const fileInfoTagStyles = createReactSelectStyles('White', '#7ba8ec');
 const mitreTagStyles = createReactSelectStyles('White', 'rgb(227, 135, 81)');
 
-const EditableTags = ({ sha256, tags, setDetails, setUpdateError }: EditableTagsProps) => {
+const EditableTags = ({ sha256, tags, onUpdate }: EditableTagsProps) => {
   const [editing, setEditing] = useState(false);
   const [pendingTags, setPendingTags] = useState<Record<string, string[]>>({});
   const [deletedTags, setDeletedTags] = useState<Record<string, string[]>>({});
@@ -253,14 +252,9 @@ const EditableTags = ({ sha256, tags, setDetails, setUpdateError }: EditableTags
     }
 
     if (!error) {
-      // update file details (specifically tags) when tags have been updated
-      const updatedFileDetails = await getFileDetails(sha256, setUpdateError ?? (() => {}));
-      if (updatedFileDetails) {
-        setShowUpdateModal(false);
-        setDetails(updatedFileDetails);
-        // exit editing mode after changes are committed
-        setEditing(false);
-      }
+      await onUpdate();
+      setShowUpdateModal(false);
+      setEditing(false);
     }
   };
 

@@ -1,4 +1,4 @@
-import { useEffect, useState, Fragment } from 'react';
+import { useState, Fragment } from 'react';
 import { Col, Form, Row, Table } from 'react-bootstrap';
 import AlertBanner from '@components/shared/alerts/AlertBanner';
 
@@ -8,6 +8,8 @@ import Subtitle from '@components/shared/titles/Subtitle';
 import Title from '@components/shared/titles/Title';
 import { getSystemStats } from '@thorpi/system';
 import { GroupsStats, Stats, UserStageStats } from '@models/system';
+import { useQuery } from '@tanstack/react-query';
+import { queryKeys } from '@thorpi/queryKeys';
 
 interface GroupStatsRow extends UserStageStats {
   group: string;
@@ -218,35 +220,17 @@ const ScalerStats: React.FC<GlobalStatsProps> = ({ stats }) => {
 };
 
 const SystemStats = () => {
-  const [getStatsError, setGetStatsError] = useState('');
-  const [systemStats, setSystemStats] = useState<Stats | null>(null);
-  const fetchStats = async () => {
-    const stats = await getSystemStats(setGetStatsError);
-    if (stats) {
-      setSystemStats(stats);
-    }
-  };
-
-  // trigger fetch stats on initial page load
-  useEffect(() => {
-    void fetchStats();
-
-    // set interval to rerun every 5 seconds
-    const intervalId = setInterval(() => {
-      void fetchStats();
-    }, 10000);
-
-    // cleanup interval on component unmount
-    return () => {
-      clearInterval(intervalId);
-    };
-  }, []);
+  const { data: systemStats, error: getStatsError } = useQuery({
+    queryKey: queryKeys.system.stats,
+    queryFn: getSystemStats,
+    refetchInterval: 10000,
+  });
 
   return (
     <Page title="Stats · Thorium">
-      {getStatsError != '' && (
+      {getStatsError && (
         <Row>
-          <AlertBanner>{getStatsError}</AlertBanner>
+          <AlertBanner>{getStatsError.message}</AlertBanner>
         </Row>
       )}
       {systemStats != null && (

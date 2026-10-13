@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // project imports
-import client, { parseRequestError } from './client';
+import client, { parseRequestError, parseRequestErrorString } from './client';
 import { getApiUrl } from '@utilities/url';
 import {
   OAuthLinkConfirmStatus,
@@ -38,22 +38,21 @@ function extractApiMessage(error: unknown): string {
  * @param errorHandler - Called with a formatted message on a non-401 failure.
  * @returns The provider names, or `null` if OAuth is disabled or the request failed.
  */
-export async function listOAuthProviders(errorHandler: (error: string) => void): Promise<string[] | null> {
+export async function listOAuthProviders(): Promise<string[] | null> {
   return client
     .get<string[]>('/oauth/')
     .then((res) => {
       if (res?.status == 200 && res.data) {
         return res.data;
       }
-      return null;
+      throw new Error('Error listing OAuth providers');
     })
     .catch((error: unknown) => {
       // 401 = OAuth not configured for this instance — not an error worth showing.
       if (axios.isAxiosError(error) && error.response?.status == 401) {
         return null;
       }
-      parseRequestError(error, errorHandler, 'List OAuth Providers');
-      return null;
+      throw new Error(parseRequestErrorString(error, 'List OAuth Providers'));
     });
 }
 
@@ -179,17 +178,20 @@ export async function confirmOAuthLink(
   errorHandler: (error: string) => void,
 ): Promise<OAuthLinkConfirmStatus> {
   const url = `/oauth/${encodeURIComponent(provider)}/link`;
-  return client
-    .post(url, { params: { username, token } })
-    .then((res) => (res?.status == 204 ? OAuthLinkConfirmStatus.Linked : OAuthLinkConfirmStatus.Error))
-    .catch((error: unknown) => {
-      // 401 = invalid/expired/used token (uniform anti-enumeration answer); an expected outcome.
-      if (axios.isAxiosError(error) && error.response?.status == 401) {
-        return OAuthLinkConfirmStatus.Expired;
-      }
-      parseRequestError(error, errorHandler, 'Confirm Account Link');
-      return OAuthLinkConfirmStatus.Error;
-    });
+  return (
+    client
+      // the backend reads username/token from the query string, so pass an empty body and put them in `params`
+      .post(url, null, { params: { username, token } })
+      .then((res) => (res?.status == 204 ? OAuthLinkConfirmStatus.Linked : OAuthLinkConfirmStatus.Error))
+      .catch((error: unknown) => {
+        // 401 = invalid/expired/used token (uniform anti-enumeration answer); an expected outcome.
+        if (axios.isAxiosError(error) && error.response?.status == 401) {
+          return OAuthLinkConfirmStatus.Expired;
+        }
+        parseRequestError(error, errorHandler, 'Confirm Account Link');
+        return OAuthLinkConfirmStatus.Error;
+      })
+  );
 }
 
 /**

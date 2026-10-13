@@ -43,3 +43,11 @@ export function hasOverlap(a: string[], b: string[]): boolean {
   const setB = new Set(b);
   return a.some((x) => setB.has(x));
 }
+
+export function groupListToRecord(groups: Group[]): Record<string, Group> {
+  const allGroups: Record<string, Group> = {};
+  for (const group of groups) {
+    allGroups[group.name] = group;
+  }
+  return allGroups;
+}

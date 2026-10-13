@@ -1,4 +1,4 @@
-import React, { Fragment, ReactNode, useEffect, useState } from 'react';
+import { Fragment, ReactNode, useEffect, useState } from 'react';
 import { Badge, Button, ButtonToolbar, Card, Col, Form, Modal, Row } from 'react-bootstrap';
 import Select from 'react-select';
 import { FaFileAlt, FaSitemap, FaTrash } from 'react-icons/fa';
@@ -71,14 +71,14 @@ const FileActionsToolbar = ({ sha256, onNavigateTab }: FileActionsToolbarProps) 
 
 interface FileInfoProps {
   details: Partial<Sample>;
-  setDetails: (details: Partial<Sample>) => void;
   groupDetails: Record<string, Group>;
   setDeletionStatus: (status: string) => void;
   // opens a file-detail tab from the toolbar rendered under the tags section
   onNavigateTab: (key: string) => void;
+  onUpdate: () => Promise<void>;
 }
 
-const FileInfo = ({ details, setDetails, groupDetails, setDeletionStatus, onNavigateTab }: FileInfoProps) => {
+const FileInfo = ({ details, onUpdate, groupDetails, setDeletionStatus, onNavigateTab }: FileInfoProps) => {
   const { userInfo } = useAuth();
   const [subs, setSubs] = useState<Sample['submissions']>([]);
   const [selectedSub, setSelectedSub] = useState<string>('');
@@ -193,7 +193,7 @@ const FileInfo = ({ details, setDetails, groupDetails, setDeletionStatus, onNavi
       </Row>
       <Row className="mt-4">
         <Col className="tags">
-          <EditableTags sha256={details.sha256!} tags={details && 'tags' in details ? (details.tags ?? {}) : {}} setDetails={setDetails} />
+          <EditableTags sha256={details.sha256!} tags={details && 'tags' in details ? (details.tags ?? {}) : {}} onUpdate={onUpdate} />
         </Col>
       </Row>
       <FileActionsToolbar sha256={details.sha256!} onNavigateTab={onNavigateTab} />

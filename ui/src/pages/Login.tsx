@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 
@@ -17,6 +17,8 @@ import { getBanner } from '@thorpi/base';
 import { buildOAuthAuthUrl, listOAuthProviders } from '@thorpi/oauth';
 import { LoginOutcome, useAuth } from '@utilities/auth';
 import { stashOAuthReturn } from '@utilities/oauthReturn';
+import { useQuery } from '@tanstack/react-query';
+import { queryKeys } from '@thorpi/queryKeys';
 
 interface LocationState {
   path?: string;
@@ -80,14 +82,28 @@ const Login = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loginErr, setLoginErr] = useState('');
-  const [banner, setBanner] = useState('');
   const [loggingIn, setLoggingIn] = useState(false);
-  const [providers, setProviders] = useState<string[]>([]);
   // set to the username once a login is rejected for an unverified email; shows the verify-email notice
   const [unverifiedUser, setUnverifiedUser] = useState<string | null>(null);
   const navigate = useNavigate();
   const { state } = useLocation() as { state: LocationState | null };
   const { login } = useAuth();
+
+  const {
+    data: bannerData,
+    error: bannerError,
+    isError: isBannerError,
+  } = useQuery({
+    queryKey: queryKeys.login.banner,
+    queryFn: getBanner,
+  });
+
+  const { data: providers } = useQuery({
+    queryKey: queryKeys.login.providers,
+    queryFn: listOAuthProviders,
+  });
+
+  const banner = isBannerError ? bannerError : bannerData;
 
   // login to Thorium and redirect if successful
   const handleAuthFormSubmit = async (username: string, password: string, handleAuthErr: (error: string) => void) => {
@@ -107,8 +123,7 @@ const Login = () => {
 
   // handle all key presses
   const handleFormKeyPress = async (e: React.KeyboardEvent<HTMLElement>) => {
-    // key code 13 is enter
-    if (e.keyCode === 13) {
+    if (e.key == 'Enter') {
       await handleAuthFormSubmit(username, password, setLoginErr);
     }
   };
@@ -119,24 +134,6 @@ const Login = () => {
     stashOAuthReturn(state?.path);
     window.location.assign(buildOAuthAuthUrl(provider));
   };
-
-  // fetch banner and set state
-  const fetchBanner = async () => {
-    const req = await getBanner(setBanner);
-    if (req) {
-      setBanner(req);
-    }
-  };
-
-  // grab the banner and any configured OAuth providers on page load
-  useEffect(() => {
-    void fetchBanner();
-    void listOAuthProviders(console.log).then((list) => {
-      if (list) {
-        setProviders(list);
-      }
-    });
-  }, []);
 
   return (
     <Page title="Login · Thorium">
@@ -153,7 +150,7 @@ const Login = () => {
               <VerifyEmailNotice username={unverifiedUser} onLogin={() => setUnverifiedUser(null)} />
             ) : (
               <>
-                {providers.length > 0 && (
+                {providers && providers.length > 0 && (
                   <>
                     <OAuthProviderButtons providers={providers} onSelect={handleOAuthSelect} disabled={loggingIn} />
                     <OrDivider>or</OrDivider>

@@ -8,6 +8,7 @@ import { InfoModel, SummaryPart, treeNodeToInfo } from '@components/shared/info/
 import { getEntity } from '@thorpi/entities';
 import { TreeNodeKey } from '@models/trees';
 import { useQuery } from '@tanstack/react-query';
+import { queryKeys } from '@thorpi/queryKeys';
 
 interface MetadataBoxProps {
   /** The info model built from the graph/tree node — rendered immediately (and as the fetch fallback). */
@@ -39,7 +40,7 @@ interface MetadataBoxProps {
  */
 const MetadataBox: React.FC<MetadataBoxProps> = ({ model, entityId, expanded }) => {
   const { data: entity, isFetching } = useQuery({
-    queryKey: ['entity', entityId],
+    queryKey: queryKeys.entity(entityId!),
     queryFn: () => getEntity(entityId!, () => {}),
     enabled: expanded && !!entityId,
     staleTime: 30 * 60 * 1000,

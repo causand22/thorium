@@ -1,4 +1,4 @@
-import client, { parseRequestError } from './client';
+import client from './client';
 
 // project imports
 import { Stats, SystemSettings } from '@models/system';
@@ -6,43 +6,29 @@ import { Stats, SystemSettings } from '@models/system';
 /**
  * Fetch system-wide runtime statistics (`GET /system/stats`).
  *
- * @param errorHandler - Called with a formatted message if the request fails.
- * @returns The system {@link Stats}, or `null` if the request failed.
+ * @returns The system {@link Stats}
  */
-export async function getSystemStats(errorHandler: (error: string) => void): Promise<Stats | null> {
+export async function getSystemStats(): Promise<Stats> {
   const url = '/system/stats';
-  return client
-    .get<Stats>(url)
-    .then((res) => {
-      if (res?.status == 200 && res.data) {
-        return res.data;
-      }
-      return null;
-    })
-    .catch((error: unknown) => {
-      parseRequestError(error, errorHandler, 'Get System Stats');
-      return null;
-    });
+  return client.get<Stats>(url).then((res) => {
+    if (res?.status == 200 && res.data) {
+      return res.data;
+    }
+    throw new Error('Error getting system stats');
+  });
 }
 
 /**
  * Fetch the system configuration settings (`GET /system/settings`).
  *
- * @param errorHandler - Called with a formatted message if the request fails.
- * @returns The {@link SystemSettings}, or `null` if the request failed.
+ * @returns The {@link SystemSettings}
  */
-export async function getSystemSettings(errorHandler: (error: string) => void): Promise<SystemSettings | null> {
+export async function getSystemSettings(): Promise<SystemSettings> {
   const url = '/system/settings';
-  return client
-    .get<SystemSettings>(url)
-    .then((res) => {
-      if (res?.status == 200 && res.data) {
-        return res.data;
-      }
-      return null;
-    })
-    .catch((error: unknown) => {
-      parseRequestError(error, errorHandler, 'Get System Settings');
-      return null;
-    });
+  return client.get<SystemSettings>(url).then((res) => {
+    if (res?.status == 200 && res.data) {
+      return res.data;
+    }
+    throw new Error('Error getting system settings');
+  });
 }

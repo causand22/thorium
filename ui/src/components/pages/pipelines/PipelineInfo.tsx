@@ -34,7 +34,7 @@ import { OverlayTipRight } from '@components/shared/overlay/tips';
 import PipelineOrderFlow from '@components/shared/pipeline/PipelineOrderFlow';
 import { ApplyBtn, DiscardBtn, OrderChangeBar } from '@components/shared/pipeline/PipelineOrderFlow.styled';
 import SimpleSubtitle from '@components/shared/titles/SimpleSubtitle';
-import { listImages } from '@thorpi/images';
+import { listImagesSimple } from '@thorpi/images';
 import { updatePipeline } from '@thorpi/pipelines';
 import { useAuth } from '@utilities/auth';
 import { cleanDescription } from '@utilities/description';
@@ -44,6 +44,8 @@ import { useDebouncedValue } from '@utilities/useDebouncedValue';
 import { pipelineToEditorObject } from '@utilities/transforms/pipeline';
 import type { Group } from '@models/groups';
 import type { EventTrigger, Pipeline, PipelineBan, PipelineUpdate } from '@models/pipelines';
+import { useQuery } from '@tanstack/react-query';
+import { queryKeys } from '@thorpi/queryKeys';
 
 // spec: ./PipelineInfo.spec.md
 
@@ -119,17 +121,17 @@ const PipelineInfo: FC<PipelineInfoProps> = ({ ref, pipeline, groups, inEditMode
   // Debounce so we don't refetch the image list on every keystroke while the group is edited.
   const debouncedEditorGroup = useDebouncedValue(editorGroup, 400);
 
+  const { data: imageList } = useQuery({
+    queryKey: queryKeys.images.simple(debouncedEditorGroup),
+    queryFn: () => listImagesSimple(debouncedEditorGroup, null, 1000),
+    enabled: !!debouncedEditorGroup,
+  });
+
   useEffect(() => {
-    if (!debouncedEditorGroup) return;
-    let cancelled = false;
-    void listImages(debouncedEditorGroup, () => {}, false, null, 1000).then((result) => {
-      if (cancelled) return;
-      if (result && 'names' in result) pipelineChecker.setValidImageNames(debouncedEditorGroup, result.names);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [debouncedEditorGroup]);
+    if (debouncedEditorGroup && imageList && 'names' in imageList) {
+      pipelineChecker.setValidImageNames(debouncedEditorGroup, imageList.names);
+    }
+  }, [debouncedEditorGroup, imageList]);
 
   const handleOrderApply = async () => {
     if (!pendingOrder) return;

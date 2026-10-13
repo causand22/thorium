@@ -1,4 +1,4 @@
-import client, { parseRequestError } from './client';
+import client, { parseRequestError, parseRequestErrorString } from './client';
 
 /**
  * Fetch the running API server version (`GET /version`).
@@ -28,7 +28,7 @@ export async function getVersion(errorHandler: (error: string) => void): Promise
  * @param errorHandler - Called with a formatted message if the request fails.
  * @returns The banner string, or `null` if not set or the request failed.
  */
-export async function getBanner(errorHandler: (error: string) => void): Promise<string | null> {
+export async function getBanner(): Promise<string> {
   const url = '/banner';
   return client
     .get<string>(url)
@@ -36,10 +36,9 @@ export async function getBanner(errorHandler: (error: string) => void): Promise<
       if (res?.status && res.status == 200 && res.data) {
         return res.data;
       }
-      return null;
+      throw new Error(parseRequestErrorString('', 'Get Banner'));
     })
     .catch((error: unknown) => {
-      parseRequestError(error, errorHandler, 'Get Banner');
-      return null;
+      throw new Error(parseRequestErrorString(error, 'Get Banner'));
     });
 }

@@ -2,7 +2,6 @@ import { Button, Col, Modal, Row } from 'react-bootstrap';
 import { OverlayTipTop } from '@components/shared/overlay/tips';
 import { Group, GroupRoleKey, GroupRoleUpdate, GroupUpdate } from '@models/groups';
 import { useState } from 'react';
-import { fetchGroups } from '@utilities/fetch';
 import { deleteGroup, updateGroup } from '@thorpi/groups';
 import AlertBanner from '@components/shared/alerts/AlertBanner';
 import { useAuth } from '@utilities/auth';
@@ -18,14 +17,12 @@ interface UpdateGroupButtonProps {
 interface LeaveGroupButtonProps {
   group: Group;
   username: string;
-  setLoading: (next: boolean) => void;
-  setGroups: (next: Record<string, Group>) => void;
+  onSuccess: () => Promise<void>;
 }
 
 interface DeleteGroupButtonProps {
   group: Group;
-  setLoading: (next: boolean) => void;
-  setGroups: (next: Record<string, Group>) => void;
+  onSuccess: () => Promise<void>;
 }
 
 export const UpdateGroupButton = ({ group, changes, disableUpdate, refreshSingleGroup }: UpdateGroupButtonProps) => {
@@ -219,7 +216,7 @@ export const UpdateGroupButton = ({ group, changes, disableUpdate, refreshSingle
   );
 };
 
-export const LeaveGroupButton = ({ group, username, setLoading, setGroups }: LeaveGroupButtonProps) => {
+export const LeaveGroupButton = ({ group, username, onSuccess }: LeaveGroupButtonProps) => {
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [leaveError, setLeaveError] = useState('');
   const handleCloseLeaveModal = () => setShowLeaveModal(false);
@@ -267,7 +264,7 @@ export const LeaveGroupButton = ({ group, username, setLoading, setGroups }: Lea
               onClick={() => {
                 void (async () => {
                   if (await updateGroup(group.name, roleAction, setLeaveError)) {
-                    void fetchGroups(setGroups as (groups: Record<string, Group> | Group[] | string[]) => void, setLoading, true);
+                    await onSuccess();
                   }
                 })();
               }}
@@ -283,7 +280,7 @@ export const LeaveGroupButton = ({ group, username, setLoading, setGroups }: Lea
   }
 };
 
-export const DeleteGroupButton = ({ group, setLoading, setGroups }: DeleteGroupButtonProps) => {
+export const DeleteGroupButton = ({ group, onSuccess }: DeleteGroupButtonProps) => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteError, setDeleteError] = useState('');
   const { userInfo } = useAuth();
@@ -319,7 +316,7 @@ export const DeleteGroupButton = ({ group, setLoading, setGroups }: DeleteGroupB
               onClick={() => {
                 void (async () => {
                   if (await deleteGroup(group.name, setDeleteError)) {
-                    void fetchGroups(setGroups as (groups: Record<string, Group> | Group[] | string[]) => void, setLoading, true);
+                    void onSuccess();
                   }
                 })();
               }}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button, Card, Col, Row } from 'react-bootstrap';
 import AlertBanner from '@components/shared/alerts/AlertBanner';
 
@@ -9,10 +9,11 @@ import Title from '@components/shared/titles/Title';
 import Markdown from '@components/shared/syntax/Markdown';
 import { OverlayTipTop } from '@components/shared/overlay/tips';
 import { cleanDescription } from '@utilities/description';
-import { listPipelines } from '@thorpi/pipelines';
-import type { Pipeline } from '@models/pipelines';
+import { listPipelinesDetails } from '@thorpi/pipelines';
 import type { ReactionSelection } from '@models/reactions';
 import type { UserInfo } from '@models/users';
+import { useQueries } from '@tanstack/react-query';
+import { queryKeys } from '@thorpi/queryKeys';
 
 // spec: ../files.spec.md
 
@@ -25,51 +26,43 @@ interface SelectPipelinesProps {
 }
 
 const SelectPipelines = ({ userInfo, setReactionsList, setError, currentSelections }: SelectPipelinesProps) => {
-  const [pipelines, setPipelines] = useState<Record<string, Pipeline[]>>({});
   const [selectedPipelines, setSelectedPipelines] = useState<SelectedPipelines>({});
-  const [pipelinesListErrors, setPipelinesListErrors] = useState<string[]>([]);
 
-  // get detailed pipelines info
+  const groups = userInfo?.groups ?? [];
+
+  const pipelineQueries = useQueries({
+    queries:
+      groups.map((group) => ({
+        queryKey: queryKeys.pipelines.details(group),
+        queryFn: () => listPipelinesDetails(group),
+        enabled: !!group,
+      })) ?? [],
+  });
+
+  const pipelineDataKey = pipelineQueries.map((query) => query.dataUpdatedAt).join('|');
+
+  const pipelines = useMemo(
+    () => Object.fromEntries(pipelineQueries.map((query, idx) => [groups[idx], query.data ?? []])),
+    [pipelineDataKey, groups],
+  );
+
   useEffect(() => {
-    let isSubscribed = true;
-    const fetchData = async () => {
-      const allPipelines: Record<string, Pipeline[]> = {};
-      const selectablePipelines: SelectedPipelines = {};
-      const errors: string[] = [];
-      if (userInfo && userInfo.groups) {
-        for (const group of userInfo.groups) {
-          const groupPipelines = (await listPipelines(group, (error: string) => errors.push(error), true)) as Pipeline[] | null;
-          if (groupPipelines) {
-            allPipelines[group] = [...groupPipelines];
-            groupPipelines.forEach((pipeline: Pipeline) => {
-              if (pipeline.group in selectablePipelines) {
-                selectablePipelines[pipeline.group][pipeline.name] = false;
-              } else {
-                selectablePipelines[pipeline.group] = { [pipeline.name]: false };
-              }
-            });
-          }
-        }
-      }
-      if (currentSelections) {
-        currentSelections.forEach((selection) => {
-          if (!(selection.group in selectablePipelines)) {
-            selectablePipelines[selection.group] = {};
-          }
-          selectablePipelines[selection.group][selection.pipeline] = true;
-        });
-      }
-      setPipelinesListErrors(errors);
-      if (isSubscribed) {
-        setPipelines(allPipelines);
-        setSelectedPipelines(selectablePipelines);
-      }
-    };
-    void fetchData();
-    return () => {
-      isSubscribed = false;
-    };
-  }, [userInfo]);
+    const selectablePipelines: SelectedPipelines = {};
+
+    Object.values(pipelines).forEach((groupPipelines) => {
+      groupPipelines.forEach((pipeline) => {
+        selectablePipelines[pipeline.group] ??= {};
+        selectablePipelines[pipeline.group][pipeline.name] = false;
+      });
+    });
+
+    currentSelections?.forEach((selection) => {
+      selectablePipelines[selection.group] ??= {};
+      selectablePipelines[selection.group][selection.pipeline] = true;
+    });
+
+    setSelectedPipelines(selectablePipelines);
+  }, [pipelines, currentSelections]);
 
   // handle pipeline button click
   const handlePipelineClick = (group: string, pipelineName: string) => {
@@ -84,8 +77,13 @@ const SelectPipelines = ({ userInfo, setReactionsList, setError, currentSelectio
     <Card className="panel">
       <Card.Body className="py-0">
         <center>
-          {pipelinesListErrors &&
-            pipelinesListErrors.map((error, idx) => <AlertBanner key={`pipeline-list-error-${idx}`}>{error}</AlertBanner>)}
+          {pipelineQueries.map((query, idx) =>
+            query.error ? (
+              <AlertBanner key={groups[idx]}>
+                Failed to list pipelines for {userInfo!.groups[idx]}: {query.error.message}
+              </AlertBanner>
+            ) : null,
+          )}
           {pipelines &&
             userInfo &&
             userInfo['groups'] &&

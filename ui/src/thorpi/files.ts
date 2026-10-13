@@ -160,11 +160,13 @@ export async function getFile(
 /**
  * Fetch a file's full metadata (`GET /files/sample/{sha256}`).
  *
+ * Legacy version of the function -- remove when fully converted over to getFileDetails
+ *
  * @param sha256 - The SHA256 of the file to fetch.
  * @param errorHandler - Called with a formatted message if the request fails.
  * @returns The {@link Sample} details, or `null` if not found or the request failed.
  */
-export async function getFileDetails(sha256: string, errorHandler: (error: string) => void): Promise<Sample | null> {
+export async function getFileDetailsLegacy(sha256: string, errorHandler: (error: string) => void): Promise<Sample | null> {
   const url = '/files/sample/' + sha256;
   return client
     .get<Sample>(url)
@@ -178,6 +180,21 @@ export async function getFileDetails(sha256: string, errorHandler: (error: strin
       parseRequestError(error, errorHandler, 'Get File Details');
       return null;
     });
+}
+
+/**
+ * Fetch a file's full metadata (`GET /files/sample/{sha256}`).
+ *
+ * @param sha256 - The SHA256 of the file to fetch.
+ * @returns The {@link Sample} details
+ */
+export async function getFileDetails(sha256: string): Promise<Sample> {
+  const url = '/files/sample/' + sha256;
+  const res = await client.get<Sample>(url);
+  if (res?.status === 200 && res.data) {
+    return res.data;
+  }
+  throw new Error('Get File Details failed');
 }
 
 /**

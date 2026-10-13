@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { FC } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
@@ -18,16 +18,18 @@ import NoResultsBanner from '@components/shared/alerts/NoResultsBanner';
 import Title from '@components/shared/titles/Title';
 import LoadingSpinner from '@components/shared/fallback/LoadingSpinner';
 import { OverlayTipRight, OverlayTipBottom } from '@components/shared/overlay/tips';
-import { getPipeline, listPipelines, updatePipeline } from '@thorpi/pipelines';
+import { getPipeline, listPipelinesDetails, updatePipeline } from '@thorpi/pipelines';
 import { useAuth } from '@utilities/auth';
-import { fetchGroups } from '@utilities/fetch';
 import { generateCopyName } from '@utilities/naming';
 import { getThoriumRole } from '@utilities/role';
 import { editorObjectToPipelineUpdate } from '@utilities/transforms/pipeline';
-import type { Group } from '@models/groups';
 import type { Pipeline, PipelineUpdate } from '@models/pipelines';
 import { RoleKey } from '@models/users';
 import { scrollToSection } from '@utilities/interactions';
+import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@thorpi/queryKeys';
+import { listGroupDetails } from '@thorpi/groups';
+import { groupListToRecord } from '@utilities/groups';
 
 /** Filter pipelines client-side by the omnibar clauses (name, creator, group). */
 const filterPipelines = (pipelines: Pipeline[], clauses: Clause[]): Pipeline[] => {
@@ -43,17 +45,37 @@ const filterPipelines = (pipelines: Pipeline[], clauses: Clause[]): Pipeline[] =
 
 const PipelineBrowsing: FC = () => {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
-  const [pipelines, setPipelines] = useState<Pipeline[]>([]);
-  const [groups, setGroups] = useState<Record<string, Group>>({});
   // expanded accordion rows + omnibar filters live in the URL so the view is shareable
   // const [activeKeys, setActiveKeys] = useUrlState(listCodec('open'), []);
   const { clauses, setClauses } = useOmnibarUrlState({ clauses: [], time: defaultTimeSelection() });
-  const { userInfo, checkCookie } = useAuth();
-
+  const { userInfo } = useAuth();
   const [activeKeys, setActiveKeys] = useState<string[]>([]);
   const location = useLocation();
 
+  const queryClient = useQueryClient();
+
+  const { data: groupDetails = [] } = useQuery({
+    queryKey: queryKeys.groups.details,
+    queryFn: () => listGroupDetails(),
+  });
+
+  const groups = groupListToRecord(groupDetails);
+
+  const groupNames = useMemo(() => Object.keys(groups), [groups]);
+
+  const pipelineQueries = useQueries({
+    queries: groupNames.map((group) => ({
+      queryKey: queryKeys.pipelines.details(group),
+      queryFn: () => listPipelinesDetails(group, null, 1000),
+    })),
+  });
+
+  const pipelines = useMemo(
+    () => pipelineQueries.flatMap((query) => query.data ?? []),
+    [pipelineQueries.map((query) => query.dataUpdatedAt).join('|')],
+  );
+
+  const loading = pipelineQueries.some((query) => query.isLoading);
   const filteredPipelines = filterPipelines(pipelines, clauses);
 
   const handleAccordionSelect = useCallback((eventKey: string | string[] | null | undefined) => {
@@ -68,14 +90,6 @@ const PipelineBrowsing: FC = () => {
     setActiveKeys((prev) => (prev.includes(key) ? prev : [...prev, key]));
   }, []);
 
-  const fetchPipelinesData = async () => {
-    setLoading(true);
-    const results = await Promise.all(Object.keys(groups).map((group) => listPipelines(group, () => void checkCookie(), true, null, 1000)));
-    setPipelines(results.filter(Boolean).flat() as Pipeline[]);
-    setLoading(false);
-    setTimeout(scrollOnLoad, 1000);
-  };
-
   const scrollOnLoad = () => {
     const hash = location.hash;
     if (hash.length <= 1) return;
@@ -89,20 +103,17 @@ const PipelineBrowsing: FC = () => {
 
   // Refetch a single pipeline and replace just that entry in place, so an edit re-renders only
   // the changed pipeline without reloading the whole list or collapsing the open accordion.
-  const refreshPipeline = useCallback(async (group: string, name: string) => {
-    const fresh = await getPipeline(group, name, () => {});
-    if (fresh) {
-      setPipelines((prev) => prev.map((p) => (p.group === group && p.name === name ? fresh : p)));
-    }
-  }, []);
+  const refreshPipeline = useCallback(
+    async (group: string, name: string) => {
+      const fresh = await getPipeline(group, name, () => {});
+      if (!fresh) return;
 
-  useEffect(() => {
-    void fetchGroups(setGroups as (groups: { [name: string]: Group } | Group[] | string[]) => void, () => {}, true);
-  }, []);
-
-  useEffect(() => {
-    void fetchPipelinesData();
-  }, [groups]);
+      queryClient.setQueryData<Pipeline[]>(['pipelines', group, 'details'], (prev = []) =>
+        prev.map((p) => (p.group === group && p.name === name ? fresh : p)),
+      );
+    },
+    [queryClient],
+  );
 
   async function handlePipelineUpdate(
     editorObj: Record<string, unknown>,
@@ -141,6 +152,13 @@ const PipelineBrowsing: FC = () => {
     },
     [navigate, pipelines],
   );
+
+  useEffect(() => {
+    if (loading) return;
+
+    const timeout = setTimeout(scrollOnLoad, 1000);
+    return () => clearTimeout(timeout);
+  }, [loading, location.hash]);
 
   const pipelineCountTip =
     userInfo && getThoriumRole(userInfo.role) == RoleKey.Admin
@@ -193,7 +211,7 @@ const PipelineBrowsing: FC = () => {
               groups={groups}
               canCreatePipeline={canCreatePipeline}
               onUpdate={handlePipelineUpdate}
-              onRefresh={() => void fetchPipelinesData()}
+              onRefresh={() => void queryClient.invalidateQueries({ queryKey: queryKeys.pipelines.all })}
               refreshPipeline={(group, name) => void refreshPipeline(group, name)}
               onExpand={expandAccordionKey}
               onCopy={handleCopyPipeline}

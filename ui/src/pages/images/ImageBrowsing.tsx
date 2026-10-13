@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { FC } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -16,15 +16,18 @@ import LoadingSpinner from '@components/shared/fallback/LoadingSpinner';
 import { OverlayTipRight, OverlayTipBottom } from '@components/shared/overlay/tips';
 import { useAuth } from '@utilities/auth';
 import { getThoriumRole } from '@utilities/role';
-import { fetchImages, fetchGroups } from '@utilities/fetch';
 import type { Image } from '@models/images';
-import type { Group } from '@models/groups';
 import { RoleKey } from '@models/users';
 import type { UserInfo } from '@models/users';
 import { scrollToSection } from '@utilities/interactions';
 import { Accordion } from '@components/shared/accordion';
 import { CountBadge, HeaderBar, OmnibarRow } from '@pages/pipelines/PipelineBrowsing.styled';
 import { Button } from '@components/shared/buttons';
+import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { listImageDetails } from '@thorpi/images';
+import { queryKeys } from '@thorpi/queryKeys';
+import { listGroupDetails } from '@thorpi/groups';
+import { groupListToRecord } from '@utilities/groups';
 
 // spec: ./SPEC.md
 
@@ -67,14 +70,31 @@ const CreateImageButton: FC<CreateImageButtonProps> = ({ userInfo }) => {
 };
 
 const ImageBrowsing: FC = () => {
-  const [loading, setLoading] = useState(false);
-  const [images, setImages] = useState<Image[]>([]);
-  const [groups, setGroups] = useState<Record<string, Group>>({});
-  // expanded accordion rows + omnibar filters live in the URL so the view is shareable
   const { clauses, setClauses } = useOmnibarUrlState({ clauses: [], time: defaultTimeSelection() });
-  const { userInfo, checkCookie } = useAuth();
-  const cancelUpdateRef = useRef(false);
+  const { userInfo } = useAuth();
   const [activeKeys, setActiveKeys] = useState<string[]>([]);
+
+  const { data: groupDetails = [], isLoading: groupsLoading } = useQuery({
+    queryKey: queryKeys.groups.details,
+    queryFn: () => listGroupDetails(),
+  });
+
+  const groups = groupListToRecord(groupDetails);
+  const groupNames = groupDetails.map((g) => g.name);
+
+  const imageQueries = useQueries({
+    queries: groupNames.map((group) => ({
+      queryKey: queryKeys.images.details(group),
+      queryFn: () => listImageDetails(group, null, 1000),
+    })),
+  });
+
+  const images = useMemo(
+    () => imageQueries.flatMap((query) => query.data ?? []).sort((a, b) => (a.group + a.name).localeCompare(b.group + b.name)),
+    [imageQueries],
+  );
+
+  const loading = groupsLoading || imageQueries.some((query) => query.isLoading);
 
   const filteredImages = filterImages(images, clauses);
 
@@ -91,24 +111,10 @@ const ImageBrowsing: FC = () => {
   }, []);
 
   useEffect(() => {
-    void fetchGroups(setGroups as (groups: { [name: string]: Group } | Group[] | string[]) => void, null as never, true);
-  }, []);
-
-  useEffect(() => {
-    cancelUpdateRef.current = false;
-    if (groups && Object.keys(groups).length) {
-      void fetchImageData();
+    if (!loading && images.length) {
+      scrollOnLoad();
     }
-    return () => {
-      cancelUpdateRef.current = true;
-    };
-  }, [groups]);
-
-  const fetchImageData = async () => {
-    await fetchImages(Object.keys(groups), setImages, cancelUpdateRef.current, () => void checkCookie(), setLoading, true);
-    // need to wait 1 second because the page takes so long to load
-    setTimeout(scrollOnLoad, 1000);
-  };
+  }, [loading, images.length]);
 
   const scrollOnLoad = () => {
     const hash = location.hash;
@@ -123,10 +129,22 @@ const ImageBrowsing: FC = () => {
 
   // Full list reload (with the loading spinner) used after a delete removes an image.
   const reloadImages = useCallback(() => {
-    if (Object.keys(groups).length) {
-      void fetchImages(Object.keys(groups), setImages, false, () => void checkCookie(), setLoading, true);
-    }
-  }, [groups, checkCookie]);
+    void Promise.all(imageQueries.map((query) => query.refetch()));
+  }, [imageQueries]);
+
+  const queryClient = useQueryClient();
+
+  const setImages = useCallback(
+    (nextImages: Image[]) => {
+      for (const group of groupNames) {
+        queryClient.setQueryData(
+          ['images', 'details', group],
+          nextImages.filter((image) => image.group === group),
+        );
+      }
+    },
+    [queryClient, groupNames],
+  );
 
   const imageCountTip =
     userInfo && getThoriumRole(userInfo.role) == RoleKey.Admin

@@ -14,15 +14,15 @@ import Download from '@components/pages/files/Download';
 import Comments from '@components/pages/files/Comments';
 import AlertBanner, { Severity } from '@components/shared/alerts/AlertBanner';
 import { GraphDataProvider } from '@components/associations/data/GraphDataContext';
-import { fetchGroups } from '@utilities/fetch';
 import { scrollToSection } from '@utilities/interactions';
 import { updateURLSection } from '@utilities/url';
 import { getFileDetails } from '@thorpi/files';
-import type { Sample } from '@models/files';
-import type { Group } from '@models/groups';
-import type { Output } from '@models/results';
 import LoadingSpinner from '@components/shared/fallback/LoadingSpinner';
 import FileInfo from './FileInfo';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { listGroupDetails } from '@thorpi/groups';
+import { queryKeys } from '@thorpi/queryKeys';
+import { getResults } from '@thorpi/results';
 
 // spec: ../EntityDetails.spec.md
 
@@ -52,15 +52,9 @@ const TabPanel = styled.div<{ $active: boolean }>`
 // File details page: header info card + tabbed sections (results/entities/associations/…)
 const FileDetails = () => {
   const { sha256 } = useParams<{ sha256: string }>();
-  const [numResults, setNumResults] = useState(0);
-  const [results, setResults] = useState<Record<string, Output[]>>({});
-  const [details, setDetails] = useState<Partial<Sample>>({});
-  const [groupDetails, setGroupDetails] = useState<Record<string, Group>>({});
   const [viewGraph, setViewGraph] = useState(false);
   const [entitiesTabSelected, setEntitiesTabSelected] = useState(false);
   const [reactionsTabSelected, setReactionsTabSelected] = useState(false);
-  const [getFileError, setGetFileError] = useState('');
-  const [loading, setLoading] = useState(true);
   const [deletionStatus, setDeletionStatus] = useState('');
   const location = useLocation();
   const section =
@@ -70,6 +64,37 @@ const FileDetails = () => {
   const associationInitial = useMemo(() => ({ samples: [sha256!] }), [sha256]);
   // the tab strip, scrolled into view when a toolbar action jumps to a tab
   const tabsRef = useRef<HTMLDivElement>(null);
+
+  const queryClient = useQueryClient();
+
+  const { data: resultsResponse = { results: {} }, isLoading: resultsIsLoading } = useQuery({
+    queryKey: queryKeys.results(sha256!),
+    queryFn: () => getResults(sha256!),
+    enabled: !!sha256,
+  });
+
+  const results = resultsResponse?.results;
+
+  const {
+    data: details = {},
+    isLoading: loading,
+    error: fileDetailsError,
+  } = useQuery({
+    queryKey: queryKeys.files.details(sha256!),
+    queryFn: () => getFileDetails(sha256!),
+    enabled: !!sha256,
+  });
+
+  const { data: groupDetails = {} } = useQuery({
+    queryKey: queryKeys.groups.details,
+    queryFn: () => listGroupDetails(),
+  });
+
+  const refetchFileDetails = async () => {
+    return queryClient.invalidateQueries({ queryKey: queryKeys.files.details(sha256!) });
+  };
+
+  const getFileError = fileDetailsError instanceof Error ? fileDetailsError.message : '';
 
   // jump to correct tab/subsection on page load
   useEffect(() => {
@@ -104,20 +129,6 @@ const FileDetails = () => {
       setAllowResultsHashUpdate(true);
     }
   }, []);
-
-  // fetch file details
-  useEffect(() => {
-    const fetchFileDetails = async () => {
-      const reqDetails = await getFileDetails(sha256!, setGetFileError);
-      setLoading(true);
-      if (reqDetails) {
-        setDetails(reqDetails);
-      }
-      setLoading(false);
-    };
-    void fetchFileDetails();
-    void fetchGroups(setGroupDetails as (groups: Record<string, Group> | Group[] | string[]) => void, () => {}, true);
-  }, [sha256, deletionStatus]);
 
   // handle tab switching with side effects
   const handleTabChange = (key: string | null) => {
@@ -173,7 +184,7 @@ const FileDetails = () => {
       {!loading && getFileError && getFileError != '' && <AlertBanner>{getFileError}</AlertBanner>}
       <FileInfo
         details={details}
-        setDetails={setDetails}
+        onUpdate={refetchFileDetails}
         groupDetails={groupDetails}
         setDeletionStatus={setDeletionStatus}
         onNavigateTab={jumpToTab}
@@ -184,14 +195,7 @@ const FileDetails = () => {
       <GraphDataProvider initial={associationInitial}>
         <TabPanels className="mt-4">
           <TabPanel $active={activeTab === 'results'}>
-            <Results
-              sha256={sha256!}
-              results={results}
-              setResults={setResults}
-              numResults={numResults}
-              allowHashUpdate={allowResultsHashUpdate}
-              setNumResults={(num: number) => setNumResults(num)}
-            />
+            <Results sha256={sha256!} results={results} isLoading={resultsIsLoading} allowHashUpdate={allowResultsHashUpdate} />
           </TabPanel>
           <TabPanel $active={activeTab === 'entities'}>
             <FileEntities sha256={sha256!} inView={entitiesTabSelected} />

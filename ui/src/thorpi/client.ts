@@ -178,5 +178,30 @@ function parseRequestError(error: unknown, errorHandler: (error: string) => void
   }
 }
 
+export function parseRequestErrorString(error: unknown, requestType: string): string {
+  if (axios.isAxiosError(error)) {
+    if (error.response) {
+      const data = error.response.data as Record<string, unknown> | string | undefined;
+      const traceVal = typeof data === 'object' && data?.trace ? data.trace : null;
+      const trace = traceVal ? ` trace: ${typeof traceVal === 'string' ? traceVal : JSON.stringify(traceVal)}` : '';
+      const errorStatus = error.response.status == 401 ? 'Permission Denied' : error.response.status;
+      if (typeof data === 'string' && data) {
+        return `${requestType}: ${data}${trace}`;
+      } else if (typeof data === 'object' && data?.error) {
+        const errMsg = typeof data.error === 'string' ? data.error : JSON.stringify(data.error);
+        return `${requestType}: ${errMsg}${trace}`;
+      } else {
+        return `Failed to ${requestType}: ${errorStatus}${trace}`;
+      }
+    } else if (error.request) {
+      return `Failed to receive a ${requestType} request response: "${String(error.request)}`;
+    } else {
+      return `Failed to setup ${requestType} request: "${error.message}"`;
+    }
+  } else {
+    return `Unexpected error: ${String(error)}`;
+  }
+}
+
 export { client as default, bigIntClient, parseRequestError };
 export type { AxiosResponse };

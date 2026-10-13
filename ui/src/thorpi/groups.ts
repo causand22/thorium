@@ -80,46 +80,47 @@ interface GroupDetailsListResponse {
 }
 
 /**
- * List groups, either as names or full details (`GET /groups/` or `/groups/details/`).
+ * List group names (`GET /groups/`).
  *
- * @param errorHandler - Called with a formatted message if the request fails.
- * @param details - When `true`, return full {@link Group} objects; when `false`, return group names.
  * @param cursor - Pagination cursor from a previous call, or `null` for the first page.
  * @param limit - Maximum number of groups to return per page (defaults to 1000).
- * @returns An array of {@link Group} details (when `details`) or names, or `null` if the request failed.
+ * @returns An array of {@link Group} names
  */
-export async function listGroups(
-  errorHandler: (error: string) => void,
-  details = false,
-  cursor: string | null = null,
-  limit = 1000,
-): Promise<Group[] | string[] | null> {
-  let url = '/groups/';
-  if (details) {
-    url += 'details/';
-  }
+export async function listGroupNames(cursor: string | null = null, limit = 1000): Promise<string[]> {
+  const url = '/groups/';
   const params: { limit: number; cursor?: string } = { limit: limit };
   if (cursor) {
     params['cursor'] = cursor;
   }
-  return client
-    .get<GroupListResponse | GroupDetailsListResponse>(url, { params: params })
-    .then((res) => {
-      if (res?.status == 200 && res.data) {
-        if (details && 'details' in res.data) {
-          return res.data.details;
-        } else if (!details && 'names' in res.data) {
-          return res.data.names;
-        } else {
-          return [];
-        }
-      }
-      return null;
-    })
-    .catch((error: unknown) => {
-      parseRequestError(error, errorHandler, 'List Groups');
-      return null;
-    });
+
+  return client.get<GroupListResponse>(url, { params: params }).then((res) => {
+    if (res?.status == 200 && res.data) {
+      return res.data.names.sort();
+    }
+    throw new Error('error fetching groups');
+  });
+}
+
+/**
+ * List groups with full details (`GET /groups/details/`).
+ *
+ * @param cursor - Pagination cursor from a previous call, or `null` for the first page.
+ * @param limit - Maximum number of groups to return per page (defaults to 1000).
+ * @returns An array of {@link Group} details (when `details`)
+ */
+export async function listGroupDetails(cursor: string | null = null, limit = 1000): Promise<Group[]> {
+  const url = '/groups/details/';
+  const params: { limit: number; cursor?: string } = { limit: limit };
+  if (cursor) {
+    params['cursor'] = cursor;
+  }
+
+  return client.get<GroupDetailsListResponse>(url, { params: params }).then((res) => {
+    if (res?.status == 200 && res.data) {
+      return res.data.details;
+    }
+    throw new Error('Error fetching groups');
+  });
 }
 
 /**

@@ -6,7 +6,7 @@ import styled from 'styled-components';
 // project imports
 import { EntityBrowseConfig } from './config';
 import { BrowsingCard, BrowsingContents, LinkFields } from '@entities/browsing/shared';
-import { listRepos } from '@thorpi/repos';
+import { listReposDetails } from '@thorpi/repos';
 import { Filters } from '@models/search';
 import { Entities } from '@models/entities/entities';
 import { getDetailsBasePathByEntity } from '@components/entities/details/EntityDetailsRoutes';
@@ -17,7 +17,7 @@ import { Repo } from '@models/repos';
 // get repos using filters and an optional cursor
 const getRepos = async (filters: Filters, cursor: string | null) => {
   // request full repo details so the listing can render repo metadata
-  const { entityList, entityCursor } = await listRepos(filters, console.log, true, cursor);
+  const { entityList, entityCursor } = await listReposDetails(filters, cursor);
   return {
     entitiesList: entityList,
     entitiesCursor: entityCursor,
