@@ -22,6 +22,7 @@ export function createEntityBrowsingPage<T extends keyof ExtendedTypeMap>(config
           onChange={setFilters}
           disabled={loading}
           creatable={config.creatable ?? true}
+          jumpToFile
         />
 
         <EntityList<ExtendedTypeMap[T]>

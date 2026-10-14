@@ -11,6 +11,7 @@ import { OmnibarMainSearch } from '../../shared/inputs/omnibar/Bars';
 import { Clause } from '../../shared/inputs/omnibar/clauses/ClauseTypes';
 import { TimeSelection, TimeSelectionToStrings, defaultTimeSelection } from '../../shared/inputs/omnibar/timepicker/utils';
 import { defaultOmnibarSettings } from '../../shared/inputs/omnibar/urlState';
+import { useFileHashJump } from '../../shared/inputs/omnibar/useFileHashJump';
 import { useOmnibarUrlState } from '../../shared/inputs/omnibar/useOmnibarUrlState';
 import { getGroupsFromClauses, getIndexesFromClauses, getSearchTextFromClauses } from '../../shared/inputs/omnibar/clauses/utils';
 import EntityList from '@entities/browsing/EntityList';
@@ -189,6 +190,8 @@ const Search = () => {
     time: defaultTimeSelection(),
     settings: defaultOmnibarSettings(),
   });
+  // pasting (or entering) a bare sha256 opens that file instead of searching for it
+  const hashJump = useFileHashJump();
   const [searching, setSearching] = useState<boolean>(true);
   const [filters, setFilters] = useState<SearchFilters>({ query: '' });
   // the id of the cursor for paging search results;
@@ -223,6 +226,7 @@ const Search = () => {
             setTime={setOmniTime}
             settings={omnibarSettings}
             setSettings={setOmnibarSettings}
+            hashJump={hashJump}
           />
         </SearchBarContainer>
       </div>

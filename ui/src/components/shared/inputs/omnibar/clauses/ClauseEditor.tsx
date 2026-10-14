@@ -1,12 +1,13 @@
-import { KeyboardEvent, useMemo, useRef, useState } from 'react';
+import { KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
 import styled from 'styled-components';
 import OmnibarDropdown, { dropdownHasContent } from './Dropdown';
 import OmnibarEntryField from './OmnibarEntryField';
 import { Clause } from './ClauseTypes';
 import { KeyName } from './EditingTypes';
 import { EditorAction, EditorContext, initialEditorState, reduceEditor } from './editorState';
+import { asBareSha256, HashJump } from './hash';
 import { OmnibarRegistry, parseBuffer, serializeClause } from './parse';
-import { buildRows } from './suggestions';
+import { buildRows, DropdownRow } from './suggestions';
 
 // spec: ../SPEC.md
 
@@ -40,7 +41,15 @@ type ClauseEditorProps = {
    * for state that reads as a filter tile but isn't a {@link Clause} (e.g. the dashboard's hidden nodes).
    */
   extraChips?: React.ReactNode;
+  /**
+   * Opt in to jumping straight to a file when the buffer is exactly one sha256, pasted or entered. Omit
+   * it and a bare hash is treated like any other text.
+   */
+  hashJump?: HashJump;
 };
+
+const LOOKING_UP_ROWS: DropdownRow[] = [{ kind: 'hint', label: 'Looking up file…' }];
+const HASH_NOT_FOUND = 'No file found with that sha256';
 
 const ClauseEditor: React.FC<ClauseEditorProps> = ({
   clauses,
@@ -50,38 +59,105 @@ const ClauseEditor: React.FC<ClauseEditorProps> = ({
   placeholder = 'Enter a query...',
   timepickerVisible = false,
   extraChips,
+  hashJump,
 }) => {
   const [state, setState] = useState(initialEditorState());
+  // the sha256 being looked up, or null. Kept outside the reducer because it is an async side effect
+  const [lookingUp, setLookingUp] = useState<string | null>(null);
+  const [hashMiss, setHashMiss] = useState<string | undefined>(undefined);
+  // bumped to invalidate a lookup in flight: any edit, blur or Escape means the answer is no longer wanted
+  const lookupToken = useRef(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const ctx: EditorContext = { clauses, registry, tagsCaseInsensitive };
 
+  function cancelHashLookup() {
+    lookupToken.current += 1;
+    setLookingUp(null);
+    setHashMiss(undefined);
+  }
+
   function dispatch(action: EditorAction) {
+    // focus and hover leave the buffer alone; everything else makes a pending lookup stale
+    if (action.type !== 'focus' && action.type !== 'hoverRow') cancelHashLookup();
     const result = reduceEditor(state, action, ctx);
     setState(result.state);
     if (result.clauses) setClauses(result.clauses);
   }
 
+  // the async callback below outlives the render that started it, so it dispatches through this
+  const latestDispatch = useRef(dispatch);
+  useEffect(() => {
+    latestDispatch.current = dispatch;
+  });
+
+  // a lookup still running when the editor unmounts must not navigate
+  useEffect(() => {
+    const token = lookupToken;
+    return () => {
+      token.current += 1;
+    };
+  }, []);
+
+  /**
+   * Check that the file exists, then open it. A miss is handled by `trigger`: on Enter, a bar with free
+   * text commits the hash as an ordinary text chip; a paste never commits anything, so it just stays in
+   * the buffer. A bar with no free text shows a message instead, since the hash can't become a chip.
+   */
+  function startHashLookup(sha256: string, trigger: 'paste' | 'enter') {
+    if (!hashJump) return;
+    const token = lookupToken.current + 1;
+    lookupToken.current = token;
+    setLookingUp(sha256);
+    setHashMiss(undefined);
+    void hashJump
+      .lookup(sha256)
+      .catch(() => false)
+      .then((found) => {
+        if (token !== lookupToken.current) return;
+        setLookingUp(null);
+        if (found) {
+          hashJump.open(sha256);
+        } else if (!registry.text) {
+          setHashMiss(HASH_NOT_FOUND);
+        } else if (trigger === 'enter') {
+          latestDispatch.current({ type: 'enter' });
+        }
+      });
+  }
+
   const rows = useMemo(
-    () => buildRows(state.buffer, registry, tagsCaseInsensitive, state.pendingKey),
-    [state.buffer, registry, tagsCaseInsensitive, state.pendingKey],
+    () => (lookingUp !== null ? LOOKING_UP_ROWS : buildRows(state.buffer, registry, tagsCaseInsensitive, state.pendingKey)),
+    [lookingUp, state.buffer, registry, tagsCaseInsensitive, state.pendingKey],
   );
   const parsed = useMemo(
     () => parseBuffer(state.buffer, registry, tagsCaseInsensitive),
     [state.buffer, registry, tagsCaseInsensitive],
   );
 
-  const errorMessage = parsed.result.kind === 'error' ? parsed.result.message : undefined;
+  const errorMessage = (parsed.result.kind === 'error' ? parsed.result.message : undefined) ?? hashMiss;
   const dropdownVisible = state.focused && dropdownHasContent(rows);
 
   function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
     switch (e.key as KeyName) {
-      case KeyName.Enter:
+      case KeyName.Enter: {
         e.preventDefault();
-        dispatch({ type: 'enter' });
+        // a lookup is already deciding what this Enter would do
+        if (lookingUp !== null) break;
+        // a highlighted row, an operator stage or an in-place chip edit all mean Enter has another job
+        const sha256 =
+          hashJump && state.activeRow === -1 && state.pendingKey === null && state.editingIndex === null
+            ? asBareSha256(state.buffer)
+            : undefined;
+        if (sha256) {
+          startHashLookup(sha256, 'enter');
+        } else {
+          dispatch({ type: 'enter' });
+        }
         break;
+      }
       case KeyName.Tab:
         e.preventDefault();
         // if buffer is empty and not editing a chip, blur to move focus to next element
@@ -144,6 +220,7 @@ const ClauseEditor: React.FC<ClauseEditorProps> = ({
         onDelete={(index) => dispatch({ type: 'deleteChip', index })}
         onContainerClick={() => dispatch({ type: 'focus' })}
         onMultiPaste={(mergedText) => dispatch({ type: 'pasteMulti', mergedText })}
+        onHashPaste={hashJump ? (sha256) => startHashLookup(sha256, 'paste') : undefined}
         inputRef={inputRef}
         extraChips={extraChips}
       />

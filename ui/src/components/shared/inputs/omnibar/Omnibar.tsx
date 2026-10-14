@@ -1,6 +1,7 @@
 import styled from 'styled-components';
 import ClauseEditor from './clauses/ClauseEditor';
 import { Clause } from './clauses/ClauseTypes';
+import { HashJump } from './clauses/hash';
 import { OmnibarRegistry } from './clauses/parse';
 import OmnibarSettingsButton from './OmnibarSettingsButton';
 import SingleTimePicker from './timepicker/SingleTimePicker';
@@ -37,6 +38,8 @@ type OmnibarProps = {
   setSettings?: (next: OmnibarSettings) => void;
   /** Tag keys offered in the settings popover's hidden-tags picker. */
   hiddenTagOptions?: string[];
+  /** Opt in to jumping straight to a file when a bare sha256 is pasted or entered. */
+  hashJump?: HashJump;
 };
 
 const Omnibar: React.FC<OmnibarProps> = ({
@@ -50,6 +53,7 @@ const Omnibar: React.FC<OmnibarProps> = ({
   settings,
   setSettings,
   hiddenTagOptions = [],
+  hashJump,
 }) => {
   return (
     <OmnibarWrapperContainer>
@@ -61,6 +65,7 @@ const Omnibar: React.FC<OmnibarProps> = ({
         placeholder={placeholder}
         timepickerVisible={time !== undefined && setTime !== undefined}
         extraChips={extraChips}
+        hashJump={hashJump}
       />
       {time !== undefined && setTime !== undefined && <SingleTimePicker time={time} setTime={setTime} />}
       {settings !== undefined && setSettings !== undefined && (

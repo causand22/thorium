@@ -7,6 +7,7 @@ import { getCreatePathByEntity } from '@components/entities/create/EntityCreateR
 import { OmnibarStandardTimeFilters } from '@components/shared/inputs/omnibar/Bars';
 import { DEFAULT_HIDDEN_TAGS } from '@components/shared/inputs/omnibar/clauses/ClauseTypes';
 import { defaultOmnibarSettings } from '@components/shared/inputs/omnibar/urlState';
+import { useFileHashJump } from '@components/shared/inputs/omnibar/useFileHashJump';
 import { useOmnibarUrlState } from '@components/shared/inputs/omnibar/useOmnibarUrlState';
 import { OverlayTipLeft } from '@components/shared/overlay/tips';
 import Title from '@components/shared/titles/Title';
@@ -26,10 +27,22 @@ interface BrowsingFiltersProps {
   // whether to show a button linking to this type's create page
   creatable?: boolean;
   kind?: Entities;
+  // whether pasting (or entering) a bare sha256 opens that file's page. Off by default: embedding pages,
+  // like the dashboard builder, must not navigate away from work in progress
+  jumpToFile?: boolean;
 }
 
-const BrowsingFilters: React.FC<BrowsingFiltersProps> = ({ onChange, disabled = false, title = null, kind, creatable = false }) => {
+const BrowsingFilters: React.FC<BrowsingFiltersProps> = ({
+  onChange,
+  disabled = false,
+  title = null,
+  kind,
+  creatable = false,
+  jumpToFile = false,
+}) => {
   const navigate = useNavigate();
+  const fileHashJump = useFileHashJump();
+  const hashJump = jumpToFile ? fileHashJump : undefined;
   // clauses + time + settings live in the URL so filtered browse views are shareable/bookmarkable
   const { clauses, setClauses, time, setTime, settings, setSettings } = useOmnibarUrlState({
     clauses: [],
@@ -83,6 +96,7 @@ const BrowsingFilters: React.FC<BrowsingFiltersProps> = ({ onChange, disabled = 
             setTime={setTime}
             settings={settings}
             setSettings={setSettings}
+            hashJump={hashJump}
           />
         </Col>
       </Row>

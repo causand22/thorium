@@ -2,6 +2,7 @@ import { useAuth } from '@utilities/auth';
 import Omnibar from './Omnibar';
 import { useTagCount, useTagKeyTotals } from '@utilities/tags';
 import { Clause, ClauseCondition } from './clauses/ClauseTypes';
+import { HashJump } from './clauses/hash';
 import {
   addGroupOptions,
   addIndexOptions,
@@ -37,6 +38,8 @@ type OmnibarTimeContainerProps = {
   setTime: (next: TimeSelection) => void;
   settings: OmnibarSettings;
   setSettings: (next: OmnibarSettings) => void;
+  /** Opt in to jumping straight to a file when a bare sha256 is pasted or entered. */
+  hashJump?: HashJump;
 };
 
 /**
@@ -52,6 +55,7 @@ export const OmnibarMainSearch: React.FC<OmnibarTimeContainerProps> = ({
   setTime,
   settings,
   setSettings,
+  hashJump,
 }) => {
   const { userInfo } = useAuth();
   const userInfoGroups = userInfo !== null ? userInfo.groups : [];
@@ -75,6 +79,7 @@ export const OmnibarMainSearch: React.FC<OmnibarTimeContainerProps> = ({
       settings={settings}
       setSettings={setSettings}
       hiddenTagOptions={Object.keys(tagOptions)}
+      hashJump={hashJump}
     />
   );
 };
@@ -92,6 +97,7 @@ export const OmnibarStandardTimeFilters: React.FC<OmnibarTimeContainerProps> = (
   setTime,
   settings,
   setSettings,
+  hashJump,
 }) => {
   const { userInfo } = useAuth();
   const userInfoGroups = userInfo !== null ? userInfo.groups : [];
@@ -113,6 +119,7 @@ export const OmnibarStandardTimeFilters: React.FC<OmnibarTimeContainerProps> = (
       settings={settings}
       setSettings={setSettings}
       hiddenTagOptions={Object.keys(tagOptions)}
+      hashJump={hashJump}
     />
   );
 };
