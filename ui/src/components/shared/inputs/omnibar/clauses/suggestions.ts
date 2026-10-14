@@ -166,13 +166,15 @@ function buildValueRows(state: BufferState): DropdownRow[] {
   // everything before the caret's segment, which the row re-emits so selection is additive
   const head = `${state.forcedTag ? TAG_PREFIX : ''}${key.key}${state.operator ?? '='}`;
   const committed = state.committedValues;
+  // only `=` can take a list: the parser rejects `!=a,b` and `~a,b`, so those operators commit on pick
+  const listable = key.orCapable && (state.operator ?? '=') === '=';
 
   const valueRow = (value: string): ChoiceRow => {
     const checked = committed.includes(value);
     const next = checked ? committed.filter((entry) => entry !== value) : [...committed, value];
-    // or-capable keys invite another value with a trailing comma; single-valued keys commit outright
-    const insert = key.orCapable ? `${head}${next.join(',')}${next.length > 0 ? ',' : ''}` : `${head}${value}`;
-    return { kind: 'value', label: value, insert, commit: !key.orCapable, category: '', checked };
+    // list-capable operators invite another value with a trailing comma; the rest commit outright
+    const insert = listable ? `${head}${next.join(',')}${next.length > 0 ? ',' : ''}` : `${head}${value}`;
+    return { kind: 'value', label: value, insert, commit: !listable, category: '', checked };
   };
 
   const matches = key.values
@@ -201,8 +203,8 @@ function buildValueRows(state: BufferState): DropdownRow[] {
     rows.push({
       kind: 'value',
       label: trimmed,
-      insert: key.orCapable ? `${head}${[...committed, trimmed].join(',')},` : `${head}${trimmed}`,
-      commit: !key.orCapable,
+      insert: listable ? `${head}${[...committed, trimmed].join(',')},` : `${head}${trimmed}`,
+      commit: !listable,
       category: '',
       helpText: `Use '${trimmed}'`,
     });

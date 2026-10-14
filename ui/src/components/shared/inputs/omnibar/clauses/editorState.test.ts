@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Clause, ClauseCondition } from './ClauseTypes';
-import { EditorAction, EditorContext, EditorState, initialEditorState, reduceEditor } from './editorState';
+import { EditorAction, EditorContext, EditorState, initialEditorState, mergeOrAppend, reduceEditor } from './editorState';
 import { OmnibarKey, OmnibarRegistry } from './parse';
 
 // spec: ../SPEC.md
@@ -138,6 +138,9 @@ describe('arrow navigation', () => {
 });
 
 const archArm: Clause = { category: 'tag', field: 'arch', condition: ClauseCondition.Is, value: { value: 'arm' } };
+const groupBeta: Clause = { category: 'group', field: 'group', condition: ClauseCondition.Is, value: { value: 'beta' } };
+const groupNotAlpha: Clause = { category: 'group', field: 'group', condition: ClauseCondition.IsNot, value: { value: 'alpha' } };
+const groupNotBeta: Clause = { category: 'group', field: 'group', condition: ClauseCondition.IsNot, value: { value: 'beta' } };
 
 describe('merging and duplicates', () => {
   it('merges a second value for an or-capable key into one chip', () => {
@@ -157,6 +160,34 @@ describe('merging and duplicates', () => {
     const foo: Clause = { category: 'text', field: 'text', condition: ClauseCondition.Is, value: { value: 'foo' } };
     const { clauses } = run([type('bar'), enter], [foo]);
     expect(clauses).toHaveLength(2);
+  });
+
+  // folding into a negated chip would silently turn "not alpha" into "alpha or beta"
+  it('does not merge into a chip with a different operator', () => {
+    const { clauses } = run([type('group=beta'), enter], [groupNotAlpha]);
+    expect(clauses).toEqual([groupNotAlpha, groupBeta]);
+  });
+
+  it('does not merge a negated clause into an existing chip', () => {
+    expect(mergeOrAppend([groupAlpha], groupNotBeta, ctxWith([groupAlpha]))).toEqual([groupAlpha, groupNotBeta]);
+  });
+
+  it('merges into the mergeable chip even when a negated chip for the same key comes first', () => {
+    const { clauses } = run([type('group=beta'), enter], [groupNotAlpha, groupAlpha]);
+    expect(clauses).toEqual([
+      groupNotAlpha,
+      { category: 'group', field: 'group', condition: ClauseCondition.IsOneOf, value: { values: ['alpha', 'beta'] } },
+    ]);
+  });
+
+  it('ignores an exact duplicate of an existing chip', () => {
+    expect(run([type('arch=arm'), enter], [archArm]).clauses).toEqual([archArm]);
+    expect(mergeOrAppend([groupNotAlpha], groupNotAlpha, ctxWith([groupNotAlpha]))).toEqual([groupNotAlpha]);
+  });
+
+  it('ignores an exact duplicate text clause', () => {
+    const foo: Clause = { category: 'text', field: 'text', condition: ClauseCondition.Is, value: { value: 'foo' } };
+    expect(run([type('foo'), enter], [foo]).clauses).toEqual([foo]);
   });
 });
 

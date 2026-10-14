@@ -140,6 +140,27 @@ describe('matchesStringClauses', () => {
   });
 });
 
+// a tag key the user invents can share a name with a reserved field (`tag:name=x`); the helpers that
+// read reserved fields must not pick it up
+describe('tag clauses that share a name with a reserved field', () => {
+  it('is not free text', () => {
+    const clauses = [single('tag', 'text', 'foo')];
+    expect(getTextFromClauses(clauses)).toEqual([]);
+    expect(getSearchTextFromClauses(clauses)).toBe('"text=foo"');
+  });
+
+  it('is not an index', () => {
+    expect(getIndexesFromClauses([single('tag', 'index', 'SampleResults')])).toEqual([]);
+  });
+
+  it('is not read by the string-field helpers', () => {
+    const clauses = [single('tag', 'creator', 'alice')];
+    expect(getStringFieldFromClauses(clauses, 'creator')).toBe('');
+    expect(getStringFieldListFromClauses(clauses, 'creator')).toEqual([]);
+    expect(matchesStringClauses(clauses, 'creator', 'bob')).toBe(true);
+  });
+});
+
 describe('getTagsFromClauses', () => {
   it('returns {} when there are no tag clauses', () => {
     expect(getTagsFromClauses([single('group', 'group', 'g1')])).toEqual({});

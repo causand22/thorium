@@ -9,7 +9,7 @@
 
 // project imports
 import { Clause, ClauseCondition, ClauseIsMulti } from './ClauseTypes';
-import { OmnibarRegistry, parseBuffer, resolveKey, serializeClause } from './parse';
+import { clausesEqual, OmnibarRegistry, parseBuffer, resolveKey, serializeClause } from './parse';
 import { sanitizePastedText, splitPastedSegments } from './paste';
 import { buildRows, DropdownRow, firstSelectableIndex, rowIsSelectable, stepSelectable } from './suggestions';
 
@@ -61,19 +61,34 @@ function clauseValues(clause: Clause): string[] {
   return ClauseIsMulti(clause) ? clause.value.values : [clause.value.value];
 }
 
+/** The only conditions that union cleanly; `!=` and `~` change meaning if folded into a list. */
+const MERGEABLE_CONDITIONS: ClauseCondition[] = [ClauseCondition.Is, ClauseCondition.IsOneOf];
+
+function isMergeable(clause: Clause): boolean {
+  return MERGEABLE_CONDITIONS.includes(clause.condition);
+}
+
+/** Append `clause` unless an identical chip is already present. */
+function appendUnlessDuplicate(clauses: Clause[], clause: Clause): Clause[] {
+  return clauses.some((entry) => clausesEqual(entry, clause)) ? clauses : [...clauses, clause];
+}
+
 /**
  * Add `clause` to the list, folding it into an existing chip for the same key when that key is
- * or-capable. Non-or-capable keys append instead: two values for one tag key genuinely AND on the
- * Scylla routes, so two chips is the honest rendering (see SPEC §7).
+ * or-capable and both chips use `=`. Anything else appends — a different operator, or a key that
+ * isn't or-capable: two values for one tag key genuinely AND on the Scylla routes, so two chips is
+ * the honest rendering (see SPEC §7). An exact duplicate of an existing chip is dropped.
  */
 export function mergeOrAppend(clauses: Clause[], clause: Clause, ctx: EditorContext): Clause[] {
-  if (clause.category === 'text') return [...clauses, clause];
+  if (clause.category === 'text') return appendUnlessDuplicate(clauses, clause);
 
   const key = resolveKey(clause.field, clause.category === 'tag', ctx.registry, ctx.tagsCaseInsensitive);
-  if (!key?.orCapable) return [...clauses, clause];
+  if (!key?.orCapable || !isMergeable(clause)) return appendUnlessDuplicate(clauses, clause);
 
-  const idx = clauses.findIndex((entry) => entry.category === clause.category && entry.field === clause.field);
-  if (idx === -1) return [...clauses, clause];
+  const idx = clauses.findIndex(
+    (entry) => entry.category === clause.category && entry.field === clause.field && isMergeable(entry),
+  );
+  if (idx === -1) return appendUnlessDuplicate(clauses, clause);
 
   const values = Array.from(new Set([...clauseValues(clauses[idx]), ...clauseValues(clause)]));
   const merged: Clause =

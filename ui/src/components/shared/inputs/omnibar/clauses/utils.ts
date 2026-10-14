@@ -18,6 +18,19 @@ function clauseValues(clause: Clause): string[] {
   return ClauseIsMulti(clause) ? clause.value.values : [clause.value.value];
 }
 
+/** The free-text clause, as built by `NewTextClause`. A tag keyed `text` is a tag, not free text. */
+function isTextClause(clause: Clause): boolean {
+  return clause.category === 'text' && clause.field === 'text';
+}
+
+/**
+ * Whether `clause` is the reserved field `field`. Tag clauses are excluded: a tag key invented by the
+ * user (`tag:name=x`) may share a name with a reserved field but must never be read as it.
+ */
+function targetsField(clause: Clause, field: string): boolean {
+  return clause.category !== 'tag' && clause.field === field;
+}
+
 /**
  * Quote a term for Elastic's `query_string`, escaping what would otherwise end the phrase.
  *
@@ -40,7 +53,7 @@ export function getSearchTextFromClauses(clauses: Clause[]): string {
   const terms: string[] = [];
 
   for (const clause of clauses) {
-    if (clause.field === 'text') {
+    if (isTextClause(clause)) {
       if (!ClauseIsMulti(clause)) terms.push(luceneQuote(clause.value.value));
       continue;
     }
@@ -62,7 +75,7 @@ export function getSearchTextFromClauses(clauses: Clause[]): string {
  * Elasticsearch — passing that to `String.includes` would match the quote characters themselves.
  */
 export function getTextFromClauses(clauses: Clause[]): string[] {
-  return clauses.filter((clause) => clause.field === 'text' && !ClauseIsMulti(clause)).map((clause) => GetValueString(clause));
+  return clauses.filter((clause) => isTextClause(clause) && !ClauseIsMulti(clause)).map((clause) => GetValueString(clause));
 }
 
 /** Collect every value from the clauses targeting `field`, de-duplicated and order-preserving. */
@@ -82,13 +95,13 @@ export function getGroupsFromClauses(clauses: Clause[]): string[] {
 }
 
 export function getIndexesFromClauses(clauses: Clause[]): ElasticIndex[] {
-  return collectValues(clauses, (clause) => clause.field === 'index').map((value) => value as ElasticIndex);
+  return collectValues(clauses, (clause) => clause.field === 'index' && clause.category === 'index').map((value) => value as ElasticIndex);
 }
 
 export function getStringFieldFromClauses(clauses: Clause[], field: string): string {
   let result = '';
   clauses
-    .filter((clause) => clause.field == field)
+    .filter((clause) => targetsField(clause, field))
     .forEach((clause) => {
       if (!ClauseIsMulti(clause)) {
         result = clause.value.value;
@@ -134,7 +147,7 @@ export function getTagsFromClauses(clauses: Clause[]): RequestTags {
  */
 export function matchesStringClauses(clauses: Clause[], field: string, value: string): boolean {
   return clauses
-    .filter((clause) => clause.field == field)
+    .filter((clause) => targetsField(clause, field))
     .every((clause) => {
       if (ClauseIsMulti(clause)) {
         return clause.value.values.includes(value);
@@ -152,7 +165,7 @@ export function matchesStringClauses(clauses: Clause[], field: string, value: st
 export function getStringFieldListFromClauses(clauses: Clause[], field: string): string[] {
   const result: string[] = [];
   clauses
-    .filter((clause) => clause.field == field)
+    .filter((clause) => targetsField(clause, field))
     .forEach((clause) => {
       result.push(...clauseValues(clause));
     });

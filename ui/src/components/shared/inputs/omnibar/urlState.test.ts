@@ -78,11 +78,36 @@ describe('clause url round-trips', () => {
     const clauses = [single('Owners', 'owner', 'a|b,c')];
     expect(roundTripClauses(clauses)).toEqual(clauses);
   });
+
+  // a user-invented tag key can share a name with a reserved field; it must stay a tag
+  it('keeps a tag keyed `text` or `index` distinct from the reserved fields', () => {
+    const clauses = [single('tag', 'text', 'foo'), single('tag', 'index', 'SampleResults')];
+    const params = clausesAndTimeToParams(clauses, { mode: 'all' });
+    expect(params.getAll('query')).toEqual([]);
+    expect(params.getAll('indexes')).toEqual([]);
+    expect(paramsToClauses(params)).toEqual(clauses);
+  });
 });
 
 describe('clause decoding', () => {
   it('an empty URL yields no clauses', () => {
     expect(paramsToClauses(new URLSearchParams(''))).toEqual([]);
+  });
+
+  // hand-edited or truncated links must never throw while the page is rendering
+  it('drops a clause whose percent-encoding is malformed and keeps the rest', () => {
+    const params = new URLSearchParams();
+    params.append('c', 'tag|arch|is%|x86');
+    params.append('c', 'tag|%zz|is|x86');
+    params.append('c', ['tag', 'arch', ClauseCondition.IsNot, 'x86'].join('|'));
+    expect(() => paramsToClauses(params)).not.toThrow();
+    expect(paramsToClauses(params)).toEqual([single('tag', 'arch', 'x86', ClauseCondition.IsNot)]);
+  });
+
+  it('drops a clause whose inner value encoding is malformed', () => {
+    const params = new URLSearchParams();
+    params.append('c', ['tag', 'arch', ClauseCondition.IsNot, '%25zz%25'].join('|'));
+    expect(paramsToClauses(params)).toEqual([]);
   });
 
   it('decodes repeated tags[KEY] values as separate clauses, matching the AND the backend performs', () => {
@@ -221,6 +246,15 @@ describe('settings url round-trips', () => {
   it('falls back to defaults for an unparseable limit', () => {
     const defaults = defaultOmnibarSettings();
     expect(paramsToSettings(new URLSearchParams('limit=abc'), defaults)).toEqual(defaults);
+  });
+
+  it.each(['', '0', '-5', '1e3', '2.5', ' 5', '5x'])('falls back to the default for limit=%j', (limit) => {
+    const defaults = defaultOmnibarSettings();
+    expect(paramsToSettings(new URLSearchParams({ limit }), defaults).limit).toBe(defaults.limit);
+  });
+
+  it('accepts a plain positive integer limit', () => {
+    expect(paramsToSettings(new URLSearchParams('limit=40'), defaultOmnibarSettings()).limit).toBe(40);
   });
 
   it('a codec round-trip via encode/decode matches the original settings', () => {

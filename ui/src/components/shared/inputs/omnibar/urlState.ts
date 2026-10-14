@@ -88,13 +88,19 @@ function encodeGenericClause(clause: Clause): string {
 }
 
 function decodeGenericClause(raw: string): Clause | undefined {
-  const parts = raw.split('|').map(decodeURIComponent);
-  if (parts.length !== 4) return undefined;
-  const [category, field, condStr, valuesStr] = parts;
-  const condition = parseClauseCondition(condStr);
-  if (!condition) return undefined;
-  const values = valuesStr ? valuesStr.split(',').map(decodeURIComponent) : [];
-  return makeClause(category, field, condition, values);
+  // links are user-editable, so a malformed escape drops this clause rather than throwing mid-render
+  try {
+    const parts = raw.split('|').map(decodeURIComponent);
+    if (parts.length !== 4) return undefined;
+    const [category, field, condStr, valuesStr] = parts;
+    const condition = parseClauseCondition(condStr);
+    if (!condition) return undefined;
+    const values = valuesStr ? valuesStr.split(',').map(decodeURIComponent) : [];
+    return makeClause(category, field, condition, values);
+  } catch (error) {
+    if (error instanceof URIError) return undefined;
+    throw error;
+  }
 }
 
 // ---- clauses <-> params ------------------------------------------------------------------------
@@ -106,11 +112,11 @@ export function clausesToParams(clauses: Clause[], params: URLSearchParams): voi
     // `!=` and `~` have no readable encoding, so they fall through to the generic form
     if (!hasDefaultCondition(clause)) {
       params.append('c', encodeGenericClause(clause));
-    } else if (clause.field === 'text') {
+    } else if (clause.field === 'text' && clause.category === 'text') {
       values.forEach((value) => params.append('query', value));
     } else if (clause.field === 'group' && clause.category === 'group') {
       values.forEach((value) => params.append('groups', value));
-    } else if (clause.field === 'index') {
+    } else if (clause.field === 'index' && clause.category === 'index') {
       values.forEach((value) => params.append('indexes', value));
     } else if (clause.category === 'tag' && clause.condition === ClauseCondition.Is) {
       params.append(`tags[${clause.field}]`, values[0]);
@@ -225,7 +231,9 @@ export function settingsToParams(settings: OmnibarSettings, params: URLSearchPar
 /** Decode settings from `params`, falling back to `defaultSettings` for any absent/unparseable field. */
 export function paramsToSettings(params: URLSearchParams, defaultSettings: OmnibarSettings): OmnibarSettings {
   const limitParam = params.get('limit');
-  const limit = limitParam !== null && Number.isInteger(Number(limitParam)) ? Number.parseInt(limitParam, 10) : defaultSettings.limit;
+  // a plain positive integer only: `Number()` alone would read '' as 0 and '1e3' as 1000
+  const parsedLimit = limitParam !== null && /^\d+$/.test(limitParam) ? Number.parseInt(limitParam, 10) : 0;
+  const limit = parsedLimit > 0 ? parsedLimit : defaultSettings.limit;
 
   const caseParam = params.get('caseInsensitive');
   const tagsCaseInsensitive = caseParam === null ? defaultSettings.tagsCaseInsensitive : caseParam === '1';
