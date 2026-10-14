@@ -11,7 +11,16 @@
 import { Clause, ClauseCondition, ClauseIsMulti } from './ClauseTypes';
 import { clausesEqual, OmnibarRegistry, parseBuffer, resolveKey, serializeClause } from './parse';
 import { sanitizePastedText, splitPastedSegments } from './paste';
-import { buildRows, DropdownRow, firstSelectableIndex, rowIsSelectable, stepSelectable } from './suggestions';
+import {
+  buildRows,
+  ChoiceRow,
+  DropdownRow,
+  firstSelectableIndex,
+  operatorStageActiveRow,
+  PendingKey,
+  rowIsSelectable,
+  stepSelectable,
+} from './suggestions';
 
 // spec: ../SPEC.md
 
@@ -23,6 +32,12 @@ export type EditorState = {
   /** Highlighted dropdown row, or -1 for "nothing active" — in which case Enter commits literally. */
   activeRow: number;
   focused: boolean;
+  /**
+   * Set between picking a key that has a choice of operators and picking the operator. The buffer is
+   * just the bare key (which parses as free text), so while this is set the dropdown lists operators
+   * and nothing reads the buffer as a clause. Any edit to the buffer clears it.
+   */
+  pendingKey: PendingKey | null;
 };
 
 /** Everything the reducer needs that it does not own. */
@@ -52,7 +67,7 @@ export type EditorAction =
 export type EditorResult = { state: EditorState; clauses?: Clause[] };
 
 export function initialEditorState(): EditorState {
-  return { buffer: '', editingIndex: null, activeRow: -1, focused: false };
+  return { buffer: '', editingIndex: null, activeRow: -1, focused: false, pendingKey: null };
 }
 
 // ---- merging ------------------------------------------------------------------------------------
@@ -101,11 +116,22 @@ export function mergeOrAppend(clauses: Clause[], clause: Clause, ctx: EditorCont
 // ---- helpers ------------------------------------------------------------------------------------
 
 function rowsFor(state: EditorState, ctx: EditorContext): DropdownRow[] {
-  return buildRows(state.buffer, ctx.registry, ctx.tagsCaseInsensitive);
+  return buildRows(state.buffer, ctx.registry, ctx.tagsCaseInsensitive, state.pendingKey);
 }
 
 function cleared(state: EditorState): EditorState {
-  return { ...state, buffer: '', editingIndex: null, activeRow: -1 };
+  return { ...state, buffer: '', editingIndex: null, activeRow: -1, pendingKey: null };
+}
+
+/** Write `row` into the buffer. A key row with a choice of operators opens the operator stage. */
+function acceptRow(state: EditorState, row: ChoiceRow): EditorState {
+  const pendingKey = row.pendingKey ?? null;
+  return {
+    ...state,
+    buffer: row.insert,
+    activeRow: pendingKey ? operatorStageActiveRow(pendingKey) : -1,
+    pendingKey,
+  };
 }
 
 /** Commit `clause`, replacing the chip under edit or merging/appending a new one. */
@@ -155,7 +181,7 @@ function commitMultiPaste(state: EditorState, ctx: EditorContext, mergedText: st
 function applyRow(state: EditorState, ctx: EditorContext, rows: DropdownRow[], index: number): EditorResult {
   const row = rows[index];
   if (!row || !rowIsSelectable(row)) return { state };
-  const next = { ...state, buffer: row.insert, activeRow: -1 };
+  const next = acceptRow(state, row);
   return row.commit ? commitBuffer(next, ctx) : { state: next };
 }
 
@@ -167,6 +193,8 @@ export function reduceEditor(state: EditorState, action: EditorAction, ctx: Edit
       return { state: { ...state, focused: true } };
 
     case 'blur': {
+      // the buffer is only a bare key here, which would commit as a free-text chip; drop it instead
+      if (state.pendingKey) return { state: { ...cleared(state), focused: false } };
       // a complete clause left in the buffer is committed rather than silently dropped
       const committed = commitBuffer(state, ctx);
       return { state: { ...cleared(committed.state), focused: false }, clauses: committed.clauses };
@@ -174,15 +202,19 @@ export function reduceEditor(state: EditorState, action: EditorAction, ctx: Edit
 
     case 'setBuffer':
       // typing always deactivates the highlight, so Enter is never hijacked mid-word
-      return { state: { ...state, buffer: action.buffer, activeRow: -1 } };
+      return { state: { ...state, buffer: action.buffer, activeRow: -1, pendingKey: null } };
 
     case 'enter': {
       const rows = rowsFor(state, ctx);
       if (state.activeRow >= 0) return applyRow(state, ctx, rows, state.activeRow);
+      // never commit the bare key of the operator stage as free text
+      if (state.pendingKey) return { state };
       return commitBuffer(state, ctx);
     }
 
     case 'tab': {
+      // in the operator stage the highlight always has a target, so Tab accepts it like Enter
+      if (state.pendingKey) return applyRow(state, ctx, rowsFor(state, ctx), state.activeRow);
       // Tab with empty buffer blurs to move to next focusable element
       if (state.buffer === '') {
         return { state: { ...state, focused: false } };
@@ -197,7 +229,7 @@ export function reduceEditor(state: EditorState, action: EditorAction, ctx: Edit
       const idx = state.activeRow >= 0 ? state.activeRow : firstSelectableIndex(rows);
       if (idx === -1) return { state };
       const row = rows[idx];
-      return rowIsSelectable(row) ? { state: { ...state, buffer: row.insert, activeRow: -1 } } : { state };
+      return rowIsSelectable(row) ? { state: acceptRow(state, row) } : { state };
     }
 
     case 'move': {
@@ -207,7 +239,10 @@ export function reduceEditor(state: EditorState, action: EditorAction, ctx: Edit
         const idx = firstSelectableIndex(rows);
         return { state: idx === -1 ? state : { ...state, activeRow: idx } };
       }
-      return { state: { ...state, activeRow: stepSelectable(rows, state.activeRow, action.delta) } };
+      const next = stepSelectable(rows, state.activeRow, action.delta);
+      // the operator stage's highlight never clears, so stepping up past the top stays on the top row
+      const activeRow = state.pendingKey && next === -1 ? firstSelectableIndex(rows) : next;
+      return { state: { ...state, activeRow } };
     }
 
     case 'backspace': {
@@ -219,6 +254,8 @@ export function reduceEditor(state: EditorState, action: EditorAction, ctx: Edit
     }
 
     case 'escape': {
+      // step back to the key stage: the bare key stays in the buffer, filtering the key list again
+      if (state.pendingKey) return { state: { ...state, pendingKey: null, activeRow: -1 } };
       if (state.activeRow >= 0) return { state: { ...state, activeRow: -1 } };
       // abandoning an in-place edit leaves the chip untouched — it was never removed from the list
       if (state.buffer !== '' || state.editingIndex !== null) return { state: cleared(state) };
@@ -229,6 +266,10 @@ export function reduceEditor(state: EditorState, action: EditorAction, ctx: Edit
       return applyRow(state, ctx, rowsFor(state, ctx), action.index);
 
     case 'hoverRow':
+      // leaving the dropdown would clear the highlight; the operator stage returns it to the default
+      if (state.pendingKey && action.index === -1) {
+        return { state: { ...state, activeRow: operatorStageActiveRow(state.pendingKey) } };
+      }
       return { state: { ...state, activeRow: action.index } };
 
     case 'editChip': {
@@ -237,7 +278,9 @@ export function reduceEditor(state: EditorState, action: EditorAction, ctx: Edit
       const text = serializeClause(clause, ctx.registry, ctx.tagsCaseInsensitive);
       // a clause this bar's vocabulary can't express round-trips to nothing; leave it delete-only
       if (text === undefined) return { state };
-      return { state: { ...state, buffer: text, editingIndex: action.index, activeRow: -1, focused: true } };
+      return {
+        state: { ...state, buffer: text, editingIndex: action.index, activeRow: -1, focused: true, pendingKey: null },
+      };
     }
 
     case 'deleteChip': {

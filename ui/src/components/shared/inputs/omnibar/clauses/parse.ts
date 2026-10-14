@@ -143,7 +143,7 @@ export function findOperator(buffer: string): { symbol: OperatorSymbol; index: n
 // ---- key resolution -----------------------------------------------------------------------------
 
 /** Build the key used for a tag the registry doesn't know about. */
-function inventedTagKey(name: string, template: TagTemplate): OmnibarKey {
+export function inventedTagKey(name: string, template: TagTemplate): OmnibarKey {
   return { key: name, kind: 'tag', creatable: true, values: [], ...template };
 }
 

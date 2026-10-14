@@ -8,7 +8,16 @@
 
 // project imports
 import { ClauseCondition, GetValueString } from './ClauseTypes';
-import { BufferState, conditionToSymbol, OmnibarKey, OmnibarRegistry, parseBuffer, TAG_PREFIX } from './parse';
+import {
+  BufferState,
+  conditionToSymbol,
+  inventedTagKey,
+  OmnibarKey,
+  OmnibarRegistry,
+  OperatorSymbol,
+  parseBuffer,
+  TAG_PREFIX,
+} from './parse';
 
 // spec: ../SPEC.md
 
@@ -16,9 +25,20 @@ import { BufferState, conditionToSymbol, OmnibarKey, OmnibarRegistry, parseBuffe
 export type HeaderRow = { kind: 'header'; label: string };
 /** A non-selectable hint, e.g. "No known values for 'foo'". */
 export type HintRow = { kind: 'hint'; label: string };
+/**
+ * A key picked from the dropdown whose operator hasn't been chosen yet. The buffer can't hold this
+ * state — `role` alone is free text — so the editor carries it alongside the buffer (see
+ * `EditorState.pendingKey`) and the dropdown lists operators until one is picked.
+ */
+export type PendingKey = {
+  key: OmnibarKey;
+  /** Whether the key must be re-emitted with the `tag:` prefix. */
+  forcedTag: boolean;
+};
+
 /** A selectable row. `insert` is the whole next buffer; `commit` means "and commit it as a chip". */
 export type ChoiceRow = {
-  kind: 'key' | 'value' | 'text';
+  kind: 'key' | 'value' | 'text' | 'operator';
   label: string;
   insert: string;
   commit: boolean;
@@ -26,12 +46,14 @@ export type ChoiceRow = {
   category: string;
   helpText?: string;
   checked?: boolean;
+  /** Set on a key row whose key has a real choice of operator: picking it opens the operator stage. */
+  pendingKey?: PendingKey;
 };
 
 export type DropdownRow = HeaderRow | HintRow | ChoiceRow;
 
 export function rowIsSelectable(row: DropdownRow): row is ChoiceRow {
-  return row.kind === 'key' || row.kind === 'value' || row.kind === 'text';
+  return row.kind === 'key' || row.kind === 'value' || row.kind === 'text' || row.kind === 'operator';
 }
 
 /** Index of the first selectable row, or -1 when there is nothing to accept. */
@@ -87,25 +109,64 @@ function compareValues(a: string, b: string): number {
 // ---- rows ---------------------------------------------------------------------------------------
 
 /**
- * The operator a key row inserts: the symbol for the key's **first** allowed condition.
+ * A key's default operator: the symbol for its **first** allowed condition.
  *
- * Ordering `conditions` is how a registry picks a key's default operator — `name` on the Pipelines bar
- * lists `Includes` first so selecting it offers substring matching, which is what people want when
- * hunting a pipeline by partial name.
+ * Ordering `conditions` is how a registry picks it. A key with a single operator inserts it straight
+ * away; a key with a choice opens the operator stage with this one highlighted — `name` on the
+ * Pipelines bar lists `Includes` first so it starts on substring matching, which is what people want
+ * when hunting a pipeline by partial name.
  */
-function defaultSymbol(key: OmnibarKey): string {
+function defaultSymbol(key: OmnibarKey): OperatorSymbol {
   return conditionToSymbol(key.conditions[0] ?? ClauseCondition.Is);
 }
 
+/** Operators shown in the operator stage, in this order on every bar. */
+const OPERATOR_DISPLAY_ORDER: OperatorSymbol[] = ['=', '!=', '~'];
+
+const OPERATOR_LABELS: Record<OperatorSymbol, string> = { '=': 'is', '!=': 'is not', '~': 'includes' };
+
+/** The distinct operator symbols a key accepts, in display order. `is` and `is one of` both read as `=`. */
+export function keyOperators(key: OmnibarKey): OperatorSymbol[] {
+  const symbols = new Set(key.conditions.map(conditionToSymbol));
+  return OPERATOR_DISPLAY_ORDER.filter((symbol) => symbols.has(symbol));
+}
+
 function keyRow(key: OmnibarKey, withPrefix: boolean): ChoiceRow {
-  return {
+  const head = `${withPrefix ? TAG_PREFIX : ''}${key.key}`;
+  const row: ChoiceRow = {
     kind: 'key',
     label: key.key,
-    insert: `${withPrefix ? TAG_PREFIX : ''}${key.key}${defaultSymbol(key)}`,
+    insert: `${head}${defaultSymbol(key)}`,
     commit: false,
     category: key.category,
     helpText: key.helpText ?? (key.total ? key.total.toLocaleString() : undefined),
   };
+  // a key with a real choice of operator opens the operator stage instead of guessing one
+  if (keyOperators(key).length > 1) return { ...row, insert: head, pendingKey: { key, forcedTag: withPrefix } };
+  return row;
+}
+
+/** Row index the operator stage starts on: the key's own default operator, below the header. */
+export function operatorStageActiveRow({ key }: PendingKey): number {
+  const index = keyOperators(key).indexOf(defaultSymbol(key));
+  return 1 + Math.max(index, 0);
+}
+
+function buildOperatorRows({ key, forcedTag }: PendingKey): DropdownRow[] {
+  const head = `${forcedTag ? TAG_PREFIX : ''}${key.key}`;
+  return [
+    { kind: 'header', label: `Operator for ${key.key}` },
+    ...keyOperators(key).map(
+      (symbol): ChoiceRow => ({
+        kind: 'operator',
+        label: OPERATOR_LABELS[symbol],
+        insert: `${head}${symbol}`,
+        commit: false,
+        category: key.category,
+        helpText: symbol,
+      }),
+    ),
+  ];
 }
 
 function buildKeyRows(state: BufferState, buffer: string, registry: OmnibarRegistry): DropdownRow[] {
@@ -138,14 +199,7 @@ function buildKeyRows(state: BufferState, buffer: string, registry: OmnibarRegis
   // offer the typed key as a brand-new tag key when it doesn't match one we know
   const trimmed = draft.trim();
   if (registry.tagTemplate && trimmed !== '' && !registry.tags.some((key) => key.key.toLowerCase() === trimmed.toLowerCase())) {
-    rows.push({
-      kind: 'key',
-      label: trimmed,
-      insert: `${forcedTag ? TAG_PREFIX : ''}${trimmed}=`,
-      commit: false,
-      category: 'tag',
-      helpText: 'Use as a tag key',
-    });
+    rows.push({ ...keyRow(inventedTagKey(trimmed, registry.tagTemplate), forcedTag), helpText: 'Use as a tag key' });
   }
 
   // free text is reachable only by typing a bare word, so advertise it rather than offering a `text=`
@@ -213,8 +267,17 @@ function buildValueRows(state: BufferState): DropdownRow[] {
   return rows;
 }
 
-/** Build the dropdown rows for the current buffer. */
-export function buildRows(buffer: string, registry: OmnibarRegistry, tagsCaseInsensitive: boolean): DropdownRow[] {
+/**
+ * Build the dropdown rows for the current buffer. While `pendingKey` is set the buffer is just the
+ * bare key, so the dropdown offers operators instead of parsing it.
+ */
+export function buildRows(
+  buffer: string,
+  registry: OmnibarRegistry,
+  tagsCaseInsensitive: boolean,
+  pendingKey?: PendingKey | null,
+): DropdownRow[] {
+  if (pendingKey) return buildOperatorRows(pendingKey);
   const state = parseBuffer(buffer, registry, tagsCaseInsensitive);
   return state.stage === 'key' ? buildKeyRows(state, buffer, registry) : buildValueRows(state);
 }

@@ -20,6 +20,14 @@ function registry(): OmnibarRegistry {
         orCapable: true,
         conditions: [ClauseCondition.Is, ClauseCondition.IsOneOf],
       }),
+      // keys with a real choice of operator open the operator stage; `name` defaults to substring
+      field('role', {
+        values: ['admin', 'analyst'],
+        creatable: false,
+        orCapable: true,
+        conditions: [ClauseCondition.Is, ClauseCondition.IsOneOf, ClauseCondition.IsNot],
+      }),
+      field('name', { conditions: [ClauseCondition.Includes, ClauseCondition.Is, ClauseCondition.IsNot] }),
     ],
     tags: [
       { key: 'arch', kind: 'tag', category: 'tag', conditions: [ClauseCondition.Is], orCapable: false, creatable: true, values: ['arm', 'x86'] },
@@ -306,6 +314,95 @@ describe('pasteMulti', () => {
       { category: 'text', field: 'text', condition: ClauseCondition.Is, value: { value: 'hello\nworld' } },
       groupAlpha,
     ]);
+  });
+});
+
+describe('operator stage', () => {
+  const escape: EditorAction = { type: 'escape' };
+  // 'rol' and 'nam' each match exactly one field, so Tab picks it
+  const pickRole = [type('rol'), tab];
+  const pickName = [type('nam'), tab];
+
+  it('opens for a key with a choice of operators, leaving the bare key in the buffer', () => {
+    const { state } = run(pickRole);
+    expect(state.buffer).toBe('role');
+    expect(state.pendingKey?.key.key).toBe('role');
+  });
+
+  it('is skipped for a key with a single operator', () => {
+    const { state } = run([type('gro'), tab]);
+    expect(state.buffer).toBe('group=');
+    expect(state.pendingKey).toBeNull();
+  });
+
+  it('is skipped when the operator is typed', () => {
+    expect(run([type('role=')]).state.pendingKey).toBeNull();
+  });
+
+  it('starts on the key default: `is` for role, `includes` for name', () => {
+    expect(run(pickRole).state.activeRow).toBe(1);
+    expect(run(pickName).state.activeRow).toBe(3);
+  });
+
+  it('accepts the highlighted operator on Enter and Tab', () => {
+    expect(run([...pickRole, enter]).state.buffer).toBe('role=');
+    expect(run([...pickRole, tab]).state.buffer).toBe('role=');
+    expect(run([...pickName, enter]).state.buffer).toBe('name~');
+  });
+
+  it('closes the stage once an operator is chosen', () => {
+    expect(run([...pickRole, enter]).state.pendingKey).toBeNull();
+  });
+
+  it('picks another operator with the arrow keys', () => {
+    expect(run([...pickRole, down, enter]).state.buffer).toBe('role!=');
+    expect(run([...pickName, up, enter]).state.buffer).toBe('name!=');
+  });
+
+  it('picks an operator by clicking its row', () => {
+    expect(run([...pickRole, { type: 'selectRow', index: 2 }]).state.buffer).toBe('role!=');
+  });
+
+  it('never clears the highlight', () => {
+    expect(run([...pickRole, up]).state.activeRow).toBe(1);
+    expect(run([...pickRole, down, down, down]).state.activeRow).toBe(2);
+    expect(run([...pickRole, down, { type: 'hoverRow', index: -1 }]).state.activeRow).toBe(1);
+  });
+
+  it('does not commit the bare key as free text if nothing is highlighted', () => {
+    const { state } = run(pickRole);
+    const result = reduceEditor({ ...state, activeRow: -1 }, enter, ctxWith());
+    expect(result.clauses).toBeUndefined();
+    expect(result.state.buffer).toBe('role');
+  });
+
+  it('hands over to the value stage, which commits a negated clause', () => {
+    const { clauses } = run([...pickRole, down, enter, type('role!=admin'), enter]);
+    expect(clauses).toEqual([
+      { category: 'role', field: 'role', condition: ClauseCondition.IsNot, value: { value: 'admin' } },
+    ]);
+  });
+
+  it('steps back to the key stage on Escape, then clears on a second Escape', () => {
+    const back = run([...pickRole, escape]).state;
+    expect(back.pendingKey).toBeNull();
+    expect(back.buffer).toBe('role');
+    expect(back.activeRow).toBe(-1);
+    expect(run([...pickRole, escape, escape]).state.buffer).toBe('');
+  });
+
+  it('steps back to the key stage when the buffer is edited', () => {
+    const { state } = run([...pickRole, type('rol')]);
+    expect(state.pendingKey).toBeNull();
+    expect(state.buffer).toBe('rol');
+  });
+
+  it('is dropped without committing anything when focus leaves', () => {
+    const { state, clauses } = run([...pickRole, { type: 'blur' }]);
+    expect(clauses).toEqual([]);
+    expect(state.buffer).toBe('');
+    expect(state.pendingKey).toBeNull();
+    expect(state.focused).toBe(false);
   });
 });
 

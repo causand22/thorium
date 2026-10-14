@@ -65,8 +65,8 @@ const ClauseEditor: React.FC<ClauseEditorProps> = ({
   }
 
   const rows = useMemo(
-    () => buildRows(state.buffer, registry, tagsCaseInsensitive),
-    [state.buffer, registry, tagsCaseInsensitive],
+    () => buildRows(state.buffer, registry, tagsCaseInsensitive, state.pendingKey),
+    [state.buffer, registry, tagsCaseInsensitive, state.pendingKey],
   );
   const parsed = useMemo(
     () => parseBuffer(state.buffer, registry, tagsCaseInsensitive),
