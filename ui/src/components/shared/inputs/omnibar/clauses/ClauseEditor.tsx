@@ -50,6 +50,7 @@ type ClauseEditorProps = {
 
 const LOOKING_UP_ROWS: DropdownRow[] = [{ kind: 'hint', label: 'Looking up file…' }];
 const HASH_NOT_FOUND = 'No file found with that sha256';
+const HASH_BANNER = 'Looks like a sha256 hash. Press Enter to look it up and open the file.';
 
 const ClauseEditor: React.FC<ClauseEditorProps> = ({
   clauses,
@@ -138,26 +139,27 @@ const ClauseEditor: React.FC<ClauseEditorProps> = ({
   );
 
   const errorMessage = (parsed.result.kind === 'error' ? parsed.result.message : undefined) ?? hashMiss;
-  const dropdownVisible = state.focused && dropdownHasContent(rows);
+
+  // the hash Enter will look up, if any. A highlighted row, an operator stage, an in-place chip edit or
+  // a lookup already running all mean Enter has another job
+  const enterHash =
+    hashJump && lookingUp === null && state.activeRow === -1 && state.pendingKey === null && state.editingIndex === null
+      ? asBareSha256(state.buffer)
+      : undefined;
+  const dropdownVisible = state.focused && (dropdownHasContent(rows) || enterHash !== undefined);
 
   function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
     switch (e.key as KeyName) {
-      case KeyName.Enter: {
+      case KeyName.Enter:
         e.preventDefault();
         // a lookup is already deciding what this Enter would do
         if (lookingUp !== null) break;
-        // a highlighted row, an operator stage or an in-place chip edit all mean Enter has another job
-        const sha256 =
-          hashJump && state.activeRow === -1 && state.pendingKey === null && state.editingIndex === null
-            ? asBareSha256(state.buffer)
-            : undefined;
-        if (sha256) {
-          startHashLookup(sha256);
+        if (enterHash) {
+          startHashLookup(enterHash);
         } else {
           dispatch({ type: 'enter' });
         }
         break;
-      }
       case KeyName.Tab:
         e.preventDefault();
         // if buffer is empty and not editing a chip, blur to move focus to next element
@@ -227,6 +229,7 @@ const ClauseEditor: React.FC<ClauseEditorProps> = ({
         <OmnibarDropdown
           ref={dropdownRef}
           rows={rows}
+          banner={enterHash ? HASH_BANNER : undefined}
           activeRow={state.activeRow}
           setActiveRow={(index) => dispatch({ type: 'hoverRow', index })}
           onSelect={(index) => dispatch({ type: 'selectRow', index })}

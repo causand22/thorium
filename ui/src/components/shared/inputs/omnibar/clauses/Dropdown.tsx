@@ -46,6 +46,12 @@ const DropdownHintDiv = styled.div`
   font-style: italic;
 `;
 
+const DropdownBannerDiv = styled.div`
+  padding: 5px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--thorium-omnibar-border);
+`;
+
 const DropdownOptionHelpText = styled.span`
   color: var(--thorium-secondary-text);
 `;
@@ -63,10 +69,15 @@ export type DropdownProps = {
   setActiveRow: (idx: number) => void;
   onSelect: (idx: number) => void;
   onMouseLeave: () => void;
+  /**
+   * A note shown above the rows, outside their numbering. It is only shown while no row is active (so
+   * `activeRow`'s index into the rows never has to account for it): it describes what Enter will do.
+   */
+  banner?: string;
   ref: React.RefObject<HTMLDivElement | null>;
 };
 
-const OmnibarDropdown: React.FC<DropdownProps> = ({ rows, activeRow, setActiveRow, onSelect, onMouseLeave, ref }) => {
+const OmnibarDropdown: React.FC<DropdownProps> = ({ rows, activeRow, setActiveRow, onSelect, onMouseLeave, banner, ref }) => {
   //Scroll to position of highlighted element
   useEffect(() => {
     if (!ref.current) return;
@@ -108,6 +119,7 @@ const OmnibarDropdown: React.FC<DropdownProps> = ({ rows, activeRow, setActiveRo
       // clears the buffer, and the click then lands on a row computed from state that no longer exists
       onMouseDown={(e) => e.preventDefault()}
     >
+      {banner && <DropdownBannerDiv role="presentation">{banner}</DropdownBannerDiv>}
       {rows.map((row, idx) => {
         if (row.kind === 'header') {
           return (
