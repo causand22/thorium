@@ -39,6 +39,9 @@ function single(category: string, field: string, value: string): Clause {
 function multi(category: string, field: string, values: string[]): Clause {
   return { category, field, condition: ClauseCondition.IsOneOf, value: { values } };
 }
+function negated(category: string, field: string, value: string): Clause {
+  return { category, field, condition: ClauseCondition.IsNot, value: { value } };
+}
 function includes(category: string, field: string, value: string): Clause {
   return { category, field, condition: ClauseCondition.Includes, value: { value } };
 }
@@ -87,6 +90,15 @@ describe('filterUsers', () => {
 
   it('resolves the Developer object role to its string name', () => {
     expect(filterUsers(USERS, [single('role', 'role', RoleKey.Developer)])).toEqual([carol]);
+  });
+
+  it('excludes a role for `role != X` instead of selecting it', () => {
+    expect(filterUsers(USERS, [negated('role', 'role', RoleKey.Admin)])).toEqual([bob, carol]);
+  });
+
+  it('combines a role exclusion with a role inclusion', () => {
+    const clauses = [negated('role', 'role', RoleKey.Admin), multi('role', 'role', [RoleKey.Admin, RoleKey.User])];
+    expect(filterUsers(USERS, clauses)).toEqual([bob]);
   });
 
   it('filters by one of several roles', () => {

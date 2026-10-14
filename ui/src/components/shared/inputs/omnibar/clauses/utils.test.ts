@@ -9,6 +9,7 @@ import {
   getStringFieldListFromClauses,
   getTagsFromClauses,
   getTextFromClauses,
+  matchesListClauses,
   matchesStringClauses,
 } from './utils';
 import { Clause, ClauseCondition } from './ClauseTypes';
@@ -104,6 +105,33 @@ describe('getStringFieldListFromClauses', () => {
 
   it('returns [] when no clause matches the field', () => {
     expect(getStringFieldListFromClauses([single('group', 'Owners', 'x')], 'Users')).toEqual([]);
+  });
+});
+
+describe('matchesListClauses', () => {
+  it('returns true when no clause targets the field', () => {
+    expect(matchesListClauses([single('group', 'group', 'g')], 'Users', ['alice'])).toBe(true);
+  });
+
+  it('requires an overlap for `is` and `is one of`', () => {
+    expect(matchesListClauses([single('Users', 'Users', 'alice')], 'Users', ['alice', 'bob'])).toBe(true);
+    expect(matchesListClauses([multi('Users', 'Users', ['carol', 'bob'])], 'Users', ['alice', 'bob'])).toBe(true);
+    expect(matchesListClauses([single('Users', 'Users', 'carol')], 'Users', ['alice', 'bob'])).toBe(false);
+  });
+
+  it('rejects any overlap for `is not`', () => {
+    expect(matchesListClauses([negated('Users', 'Users', 'alice')], 'Users', ['alice', 'bob'])).toBe(false);
+    expect(matchesListClauses([negated('Users', 'Users', 'carol')], 'Users', ['alice', 'bob'])).toBe(true);
+  });
+
+  it('applies an exclusion on top of an inclusion', () => {
+    const clauses = [multi('Users', 'Users', ['alice', 'bob']), negated('Users', 'Users', 'bob')];
+    expect(matchesListClauses(clauses, 'Users', ['alice'])).toBe(true);
+    expect(matchesListClauses(clauses, 'Users', ['alice', 'bob'])).toBe(false);
+  });
+
+  it('ignores a tag clause that shares the field name', () => {
+    expect(matchesListClauses([negated('tag', 'Users', 'alice')], 'Users', ['alice'])).toBe(true);
   });
 });
 

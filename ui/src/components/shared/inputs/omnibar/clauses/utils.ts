@@ -162,6 +162,26 @@ export function matchesStringClauses(clauses: Clause[], field: string, value: st
     });
 }
 
+/**
+ * Test whether a collection of `candidates` (e.g. a group's users, or a user's single role) satisfies
+ * the clauses targeting `field`, honoring negation: `is`/`is one of` values must overlap the
+ * candidates (several such clauses union), and `is not` values must not. Returns `true` when no
+ * clause targets the field.
+ *
+ * Use this rather than {@link getStringFieldListFromClauses} for any field that allows `!=`, since that
+ * helper flattens every clause's values and would read `role != Admin` as `role = Admin`.
+ */
+export function matchesListClauses(clauses: Clause[], field: string, candidates: string[]): boolean {
+  const included: string[] = [];
+  const excluded: string[] = [];
+  for (const clause of clauses) {
+    if (!targetsField(clause, field)) continue;
+    (clause.condition === ClauseCondition.IsNot ? excluded : included).push(...clauseValues(clause));
+  }
+  if (excluded.some((value) => candidates.includes(value))) return false;
+  return included.length === 0 || included.some((value) => candidates.includes(value));
+}
+
 export function getStringFieldListFromClauses(clauses: Clause[], field: string): string[] {
   const result: string[] = [];
   clauses

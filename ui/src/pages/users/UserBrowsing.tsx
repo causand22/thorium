@@ -14,7 +14,7 @@ import { useOmnibarUrlState } from '@components/shared/inputs/omnibar/useOmnibar
 import {
   getGroupsFromClauses,
   getStringFieldFromClauses,
-  getStringFieldListFromClauses,
+  matchesListClauses,
   matchesStringClauses,
 } from '@components/shared/inputs/omnibar/clauses/utils';
 import NoResultsBanner from '@components/shared/alerts/NoResultsBanner';
@@ -35,7 +35,6 @@ import { RoleKey, UserInfo } from '@models/users';
  */
 export const filterUsers = (users: UserInfo[], clauses: Clause[]): UserInfo[] => {
   const groups = getGroupsFromClauses(clauses);
-  const roles = getStringFieldListFromClauses(clauses, 'role');
   const verified = getStringFieldFromClauses(clauses, 'verified');
   const local = getStringFieldFromClauses(clauses, 'local');
 
@@ -43,7 +42,7 @@ export const filterUsers = (users: UserInfo[], clauses: Clause[]): UserInfo[] =>
     const usernameFilter = matchesStringClauses(clauses, 'username', user.username);
     const emailFilter = matchesStringClauses(clauses, 'email', user.email);
     const groupFilter = groups.length > 0 ? hasOverlap(user.groups, groups) : true;
-    const roleFilter = roles.length > 0 ? roles.includes(getThoriumRole(user.role)) : true;
+    const roleFilter = matchesListClauses(clauses, 'role', [getThoriumRole(user.role)]);
     const verifiedFilter = verified === '' ? true : user.verified === (verified === 'true');
     const localFilter = local === '' ? true : user.local === (local === 'true');
     return usernameFilter && emailFilter && groupFilter && roleFilter && verifiedFilter && localFilter;

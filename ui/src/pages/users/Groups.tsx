@@ -15,8 +15,8 @@ import { Clause } from '@components/shared/inputs/omnibar/clauses/ClauseTypes';
 import { defaultTimeSelection } from '@components/shared/inputs/omnibar/timepicker/utils';
 import { defaultOmnibarSettings } from '@components/shared/inputs/omnibar/urlState';
 import { useOmnibarUrlState } from '@components/shared/inputs/omnibar/useOmnibarUrlState';
-import { getGroupsFromClauses, getStringFieldListFromClauses } from '@components/shared/inputs/omnibar/clauses/utils';
-import { getAllGroupUsers, groupListToRecord, hasOverlap } from '@utilities/groups';
+import { getGroupsFromClauses, matchesListClauses } from '@components/shared/inputs/omnibar/clauses/utils';
+import { getAllGroupUsers, groupListToRecord } from '@utilities/groups';
 import { useAuth } from '@utilities/auth';
 import { listUsersSimple } from '@thorpi/users';
 import { createGroup, getGroup, listGroupDetails } from '@thorpi/groups';
@@ -27,19 +27,15 @@ import { queryKeys } from '@thorpi/queryKeys';
 
 const filterGroups = (groups: Record<string, Group>, clauses: Clause[]): Record<string, Group> => {
   const clauseGroups = getGroupsFromClauses(clauses);
-  const clauseUsers = getStringFieldListFromClauses(clauses, 'Users');
-  const clauseOwners = getStringFieldListFromClauses(clauses, 'Owners');
-  const clauseManagers = getStringFieldListFromClauses(clauses, 'Managers');
-
   const e = Object.entries(groups).filter(([name, obj]) => {
     const users = getAllGroupUsers(obj.users);
     const owners = getAllGroupUsers(obj.owners);
     const managers = getAllGroupUsers(obj.managers);
 
     const groupTest = clauseGroups.length > 0 ? clauseGroups.includes(name) : true;
-    const userTest = clauseUsers.length > 0 ? hasOverlap(users, clauseUsers) : true;
-    const ownerTest = clauseOwners.length > 0 ? hasOverlap(owners, clauseOwners) : true;
-    const managerTest = clauseManagers.length > 0 ? hasOverlap(managers, clauseManagers) : true;
+    const userTest = matchesListClauses(clauses, 'Users', users);
+    const ownerTest = matchesListClauses(clauses, 'Owners', owners);
+    const managerTest = matchesListClauses(clauses, 'Managers', managers);
 
     return groupTest && userTest && ownerTest && managerTest;
   });
