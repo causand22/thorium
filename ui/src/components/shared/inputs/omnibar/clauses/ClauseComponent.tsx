@@ -1,6 +1,5 @@
 import { useRef, useLayoutEffect, ClipboardEvent, KeyboardEvent, forwardRef } from 'react';
 import { styled } from 'styled-components';
-import { asBareSha256 } from './hash';
 import { sanitizePastedText, splitPastedSegments } from './paste';
 
 // spec: ../SPEC.md
@@ -54,11 +53,6 @@ type AutoWidthInputProps = {
    * for the in-place chip-edit input, which always stays single-segment.
    */
   onMultiPaste?: (mergedText: string) => void;
-  /**
-   * Called, after the buffer has been updated, when a paste leaves the whole buffer as exactly one sha256
-   * (see `./hash`). Omitted for the in-place chip-edit input, and on bars with no hash jump.
-   */
-  onHashPaste?: (sha256: string) => void;
 };
 
 /**
@@ -77,7 +71,6 @@ export const AutoWidthInput = forwardRef<HTMLInputElement, AutoWidthInputProps>(
       onFocus,
       'aria-label': ariaLabel,
       onMultiPaste,
-      onHashPaste,
     },
     ref,
   ) => {
@@ -108,17 +101,6 @@ export const AutoWidthInput = forwardRef<HTMLInputElement, AutoWidthInputProps>(
       }
 
       const sanitized = sanitizePastedText(clipboardText);
-
-      if (onHashPaste) {
-        const merged = value.slice(0, start) + sanitized + value.slice(end);
-        const sha256 = asBareSha256(merged);
-        if (sha256) {
-          e.preventDefault();
-          onChange(merged);
-          onHashPaste(sha256);
-          return;
-        }
-      }
 
       if (sanitized === clipboardText) return;
 

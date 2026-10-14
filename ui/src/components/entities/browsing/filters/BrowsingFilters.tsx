@@ -27,7 +27,7 @@ interface BrowsingFiltersProps {
   // whether to show a button linking to this type's create page
   creatable?: boolean;
   kind?: Entities;
-  // whether pasting (or entering) a bare sha256 opens that file's page. Off by default: embedding pages,
+  // whether pressing Enter on a bare sha256 opens that file's page. Off by default: embedding pages,
   // like the dashboard builder, must not navigate away from work in progress
   jumpToFile?: boolean;
 }

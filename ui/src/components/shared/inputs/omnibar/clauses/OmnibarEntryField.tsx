@@ -72,8 +72,6 @@ type OmnibarEntryFieldProps = {
   onContainerClick: () => void;
   /** A paste into the new-clause input resolved to 2+ segments; never offered to the in-place-edit input. */
   onMultiPaste: (mergedText: string) => void;
-  /** A paste left the new-clause input holding exactly one sha256; absent when the bar has no hash jump. */
-  onHashPaste?: (sha256: string) => void;
   /** Ref to the buffer input for parent focus control. */
   inputRef?: React.RefObject<HTMLInputElement | null>;
   /** Extra removable tiles rendered after the clause chips, before the new-clause input. */
@@ -97,7 +95,6 @@ const OmnibarEntryField: React.FC<OmnibarEntryFieldProps> = ({
   onDelete,
   onContainerClick,
   onMultiPaste,
-  onHashPaste,
   inputRef: parentInputRef,
   extraChips,
 }) => {
@@ -116,9 +113,7 @@ const OmnibarEntryField: React.FC<OmnibarEntryFieldProps> = ({
       onChange={onBufferChange}
       onKeyDown={onKeyDown}
       onFocus={onFocus}
-      onMultiPaste={allowMultiPaste ? onMultiPaste : undefined}
-      onHashPaste={allowMultiPaste ? onHashPaste : undefined}
-    />
+      onMultiPaste={allowMultiPaste ? onMultiPaste : undefined}    />
   );
 
   return (

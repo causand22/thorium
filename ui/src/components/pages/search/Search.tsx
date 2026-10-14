@@ -190,7 +190,7 @@ const Search = () => {
     time: defaultTimeSelection(),
     settings: defaultOmnibarSettings(),
   });
-  // pasting (or entering) a bare sha256 opens that file instead of searching for it
+  // pressing Enter on a bare sha256 opens that file instead of searching for it
   const hashJump = useFileHashJump();
   const [searching, setSearching] = useState<boolean>(true);
   const [filters, setFilters] = useState<SearchFilters>({ query: '' });

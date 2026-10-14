@@ -42,8 +42,8 @@ type ClauseEditorProps = {
    */
   extraChips?: React.ReactNode;
   /**
-   * Opt in to jumping straight to a file when the buffer is exactly one sha256, pasted or entered. Omit
-   * it and a bare hash is treated like any other text.
+   * Opt in to jumping straight to a file when Enter is pressed on a buffer that is exactly one sha256.
+   * Omit it and a bare hash is treated like any other text.
    */
   hashJump?: HashJump;
 };
@@ -102,11 +102,11 @@ const ClauseEditor: React.FC<ClauseEditorProps> = ({
   }, []);
 
   /**
-   * Check that the file exists, then open it. A miss is handled by `trigger`: on Enter, a bar with free
-   * text commits the hash as an ordinary text chip; a paste never commits anything, so it just stays in
-   * the buffer. A bar with no free text shows a message instead, since the hash can't become a chip.
+   * Check that the file exists, then open it. On a miss a bar with free text commits the hash as an
+   * ordinary text chip, as Enter would have; a bar with none shows a message instead, since the hash
+   * can't become a chip.
    */
-  function startHashLookup(sha256: string, trigger: 'paste' | 'enter') {
+  function startHashLookup(sha256: string) {
     if (!hashJump) return;
     const token = lookupToken.current + 1;
     lookupToken.current = token;
@@ -122,7 +122,7 @@ const ClauseEditor: React.FC<ClauseEditorProps> = ({
           hashJump.open(sha256);
         } else if (!registry.text) {
           setHashMiss(HASH_NOT_FOUND);
-        } else if (trigger === 'enter') {
+        } else {
           latestDispatch.current({ type: 'enter' });
         }
       });
@@ -152,7 +152,7 @@ const ClauseEditor: React.FC<ClauseEditorProps> = ({
             ? asBareSha256(state.buffer)
             : undefined;
         if (sha256) {
-          startHashLookup(sha256, 'enter');
+          startHashLookup(sha256);
         } else {
           dispatch({ type: 'enter' });
         }
@@ -219,9 +219,7 @@ const ClauseEditor: React.FC<ClauseEditorProps> = ({
         onBeginEdit={(index) => dispatch({ type: 'editChip', index })}
         onDelete={(index) => dispatch({ type: 'deleteChip', index })}
         onContainerClick={() => dispatch({ type: 'focus' })}
-        onMultiPaste={(mergedText) => dispatch({ type: 'pasteMulti', mergedText })}
-        onHashPaste={hashJump ? (sha256) => startHashLookup(sha256, 'paste') : undefined}
-        inputRef={inputRef}
+        onMultiPaste={(mergedText) => dispatch({ type: 'pasteMulti', mergedText })}        inputRef={inputRef}
         extraChips={extraChips}
       />
       {errorMessage && <ErrorMessage role="alert">{errorMessage}</ErrorMessage>}

@@ -38,7 +38,7 @@ type OmnibarTimeContainerProps = {
   setTime: (next: TimeSelection) => void;
   settings: OmnibarSettings;
   setSettings: (next: OmnibarSettings) => void;
-  /** Opt in to jumping straight to a file when a bare sha256 is pasted or entered. */
+  /** Opt in to jumping straight to a file when Enter is pressed on a bare sha256. */
   hashJump?: HashJump;
 };
 

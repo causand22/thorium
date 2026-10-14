@@ -38,7 +38,7 @@ type OmnibarProps = {
   setSettings?: (next: OmnibarSettings) => void;
   /** Tag keys offered in the settings popover's hidden-tags picker. */
   hiddenTagOptions?: string[];
-  /** Opt in to jumping straight to a file when a bare sha256 is pasted or entered. */
+  /** Opt in to jumping straight to a file when Enter is pressed on a bare sha256. */
   hashJump?: HashJump;
 };
 
