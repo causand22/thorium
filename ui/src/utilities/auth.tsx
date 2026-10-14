@@ -1,11 +1,11 @@
-import React, { createContext, JSX, useContext, useEffect, useState } from 'react';
+import React, { createContext, JSX, useContext, useEffect, useRef, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 
 // project imports
 import { authUserPass, createUser, logout, whoami } from '@thorpi/users';
 import { UserInfo, RoleKey, ScopedToken } from '@models/users';
 import { clearTagDataFromLocalStorage, fetchLocalStorageTags } from './tags';
-import { clearScopedSession, getScopedFromSession, setScopedSession } from '@thorpi/client';
+import { clearScopedSession, getScopedFromSession, setScopedSession, setUnauthorizedHandler } from '@thorpi/client';
 
 // spec: ./auth.spec.md
 
@@ -81,6 +81,13 @@ export function buildRevokeCookie() {
   return `THORIUM_TOKEN=; Secure; SameSite=Strict; max-age=0; path=/; domain=${location.hostname}`;
 }
 
+// Host-only variant (no Domain) of the revoke cookie. Older UI builds wrote the token without a
+// working Domain, and that cookie is distinct from the domain-scoped one, so buildRevokeCookie
+// alone leaves it behind and the stale token keeps getting sent.
+export function buildLegacyRevokeCookie() {
+  return 'THORIUM_TOKEN=; Secure; SameSite=Strict; max-age=0; path=/';
+}
+
 /*
  * Thorium auth hooks for login, logout and token revocation
  */
@@ -103,6 +110,7 @@ function useAuthProvider() {
       } else {
         clearTagDataFromLocalStorage();
         document.cookie = buildRevokeCookie();
+        document.cookie = buildLegacyRevokeCookie();
         setToken('');
       }
     }
@@ -130,7 +138,7 @@ function useAuthProvider() {
     // need to run whoami to get user info after login
   }, [token, activeScopedToken]);
 
-  return {
+  const auth = {
     userInfo,
     token,
     scopedToken: activeScopedToken,
@@ -155,6 +163,7 @@ function useAuthProvider() {
         return response;
       } else {
         document.cookie = buildRevokeCookie();
+        document.cookie = buildLegacyRevokeCookie();
         setUserInfo(null);
         setToken(undefined);
         return null;
@@ -240,6 +249,21 @@ function useAuthProvider() {
       clearScopedSession();
     },
   };
+
+  // A 401 from any API call re-validates the token via whoami (checkCookie clears it on failure).
+  // 401 can also mean "not permitted", so whoami decides. One check at a time for bursts of 401s.
+  const checking = useRef<Promise<unknown> | null>(null);
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      checking.current ??= auth.checkCookie().finally(() => {
+        checking.current = null;
+      });
+      return checking.current;
+    });
+    return () => setUnauthorizedHandler(undefined);
+  }, []);
+
+  return auth;
 }
 
 /**

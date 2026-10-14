@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 // project imports
-import { buildCookie, buildRevokeCookie } from './auth';
+import { buildCookie, buildRevokeCookie, buildLegacyRevokeCookie } from './auth';
 
 // buildCookie/buildRevokeCookie read location.hostname at call time; the node test
 // environment has no global location, so stub it for these tests.
@@ -57,5 +57,15 @@ describe('THORIUM_TOKEN cookie contract', () => {
     const revoke = parseCookie(buildRevokeCookie()).attrs;
     expect(revoke.domain).toBe(set.domain);
     expect(revoke.path).toBe(set.path);
+  });
+
+  // Regression: cookies written by older builds had no Domain and survive buildRevokeCookie.
+  it('buildLegacyRevokeCookie expires the host-only cookie (no domain)', () => {
+    const { name, value, attrs } = parseCookie(buildLegacyRevokeCookie());
+    expect(name).toBe('THORIUM_TOKEN');
+    expect(value).toBe('');
+    expect(attrs['max-age']).toBe('0');
+    expect(attrs.path).toBe('/');
+    expect(attrs.domain).toBeUndefined();
   });
 });

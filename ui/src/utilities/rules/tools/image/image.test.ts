@@ -14,7 +14,7 @@ lifetime:
     amount: 32
 resources:
     cpu: 1000
-    memory: 512
+    memory: 512Mi
 display_type: JSON
 collect_logs: true
 generator: false
@@ -273,14 +273,14 @@ describe('suggestion schemas', () => {
       expect(lifetimeSugg!.schema!.fields!['amount'].type).toBe(FieldValueType.Number);
     });
 
-    test('resources suggestion has object schema with numeric sub-fields', () => {
+    test('resources suggestion has object schema with quantity sub-fields', () => {
       const minimal = `group: test\nname: minimal`;
       const s = imageSuggestions(minimal);
       const resourcesSugg = s.find((sg) => sg.field === 'resources');
       expect(resourcesSugg?.schema).toBeDefined();
       expect(resourcesSugg!.schema!.type).toBe(FieldValueType.Object);
-      expect(resourcesSugg!.schema!.fields!['cpu'].type).toBe(FieldValueType.Number);
-      expect(resourcesSugg!.schema!.fields!['memory'].type).toBe(FieldValueType.Number);
+      expect(resourcesSugg!.schema!.fields!['cpu'].type).toBe(FieldValueType.String);
+      expect(resourcesSugg!.schema!.fields!['memory'].type).toBe(FieldValueType.String);
       expect(resourcesSugg!.schema!.fields!['worker_slots'].type).toBe(FieldValueType.Number);
     });
 

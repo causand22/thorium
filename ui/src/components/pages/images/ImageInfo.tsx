@@ -45,6 +45,7 @@ import { fetchSingleImage } from '@utilities/fetch';
 import { getThoriumRole } from '@utilities/role';
 import { FormatType } from '@utilities/rules/types';
 import { editorObjectToImageUpdate, imageToEditorObject } from '@utilities/transforms/image';
+import { validateResourceQuantities } from '@utilities/resources';
 import type { Group } from '@models/groups';
 import type {
   Image,
@@ -148,6 +149,12 @@ const ImageInfo: FC<ImageInfoProps> = ({ ref, images, image, setImages, inEditMo
         return;
       }
       setUpdateError('');
+    }
+
+    const resourceError = Object.values(validateResourceQuantities(editorObj.resources))[0];
+    if (resourceError) {
+      setUpdateError(resourceError);
+      return;
     }
 
     const result = editorObjectToImageUpdate(editorObj, currentImage);

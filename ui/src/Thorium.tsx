@@ -167,7 +167,6 @@ const Site = () => (
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5, //fresh for 5 mins
       gcTime: 100 * 60 * 30, //keep in cache for 30 mins after unused
       refetchOnWindowFocus: false,
       refetchOnMount: true, // only fetches if stale

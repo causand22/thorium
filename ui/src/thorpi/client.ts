@@ -100,6 +100,31 @@ export function thoriumCookieAuthConfig() {
   };
 }
 
+// Called when an API request using the cookie token returns 401. Registered by the auth provider
+// (which owns the auth state) so this module doesn't depend on React.
+let unauthorizedHandler: (() => Promise<unknown>) | undefined;
+
+export function setUnauthorizedHandler(handler: (() => Promise<unknown>) | undefined) {
+  unauthorizedHandler = handler;
+}
+
+// Reject unchanged so callers keep their own error handling, but let the auth provider check the
+// token. whoami itself is excluded to avoid recursion; scoped sessions use a different token.
+function onResponseError(error: unknown): Promise<never> {
+  if (
+    axios.isAxiosError(error) &&
+    error.response?.status === 401 &&
+    !error.config?.url?.includes('/users/whoami') &&
+    !getScopedFromSession() &&
+    getCookie('THORIUM_TOKEN')
+  ) {
+    void unauthorizedHandler?.();
+  }
+  return Promise.reject(error instanceof Error ? error : new Error(String(error)));
+}
+
+client.interceptors.response.use((res) => res, onResponseError);
+
 client.interceptors.request.use((config) => {
   if (CONFIG.headers) {
     for (const header in CONFIG.headers) {
@@ -126,6 +151,8 @@ const bigIntClient = axios.create({
     },
   ],
 });
+
+bigIntClient.interceptors.response.use((res) => res, onResponseError);
 
 bigIntClient.interceptors.request.use((config) => {
   if (CONFIG.headers) {

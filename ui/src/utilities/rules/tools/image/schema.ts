@@ -347,9 +347,13 @@ export const IMAGE_FIELD_SCHEMAS: Record<string, FieldSchema> = {
     typeName: 'Resources',
     description: 'CPU, memory, and GPU resources required',
     fields: {
-      cpu: { type: FieldValueType.Number, placeholder: '1000', description: 'CPU in millicpu' },
-      memory: { type: FieldValueType.Number, placeholder: '4096', description: 'RAM in mebibytes' },
-      ephemeral_storage: { type: FieldValueType.Number, placeholder: '0', description: 'Ephemeral storage in mebibytes' },
+      cpu: { type: FieldValueType.String, placeholder: '1000m', description: 'CPU in cores (2) or millicores (500m)' },
+      memory: { type: FieldValueType.String, placeholder: '4Gi', description: 'RAM with a Mi or Gi suffix (512Mi, 4Gi)' },
+      ephemeral_storage: {
+        type: FieldValueType.String,
+        placeholder: '8Gi',
+        description: 'Ephemeral storage with a Mi or Gi suffix (512Mi, 8Gi)',
+      },
       worker_slots: { type: FieldValueType.Number, placeholder: '1', description: 'Concurrent job slots consumed' },
       nvidia_gpu: { type: FieldValueType.Number, placeholder: '0', description: 'Nvidia GPUs required' },
       amd_gpu: { type: FieldValueType.Number, placeholder: '0', description: 'AMD GPUs required' },
@@ -358,8 +362,8 @@ export const IMAGE_FIELD_SCHEMAS: Record<string, FieldSchema> = {
         typeName: 'BurstableResources',
         description: 'Extra resources for burstable workloads',
         fields: {
-          cpu: { type: FieldValueType.Number, placeholder: '1000', description: 'Burstable CPU in millicpu' },
-          memory: { type: FieldValueType.Number, placeholder: '4096', description: 'Burstable RAM in mebibytes' },
+          cpu: { type: FieldValueType.String, placeholder: '2000m', description: 'Burstable CPU in cores (2) or millicores (500m)' },
+          memory: { type: FieldValueType.String, placeholder: '8Gi', description: 'Burstable RAM with a Mi or Gi suffix (512Mi, 8Gi)' },
         },
       },
     },

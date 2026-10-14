@@ -37,9 +37,23 @@ describe('imageToEditorObject', () => {
     expect(result.name).toBe('scanner');
     expect(result.image).toBe('thorium/scanner:latest');
     expect(result.timeout).toBe(300);
-    expect(result.resources).toEqual({ cpu: 1000 });
+    expect(result.resources).toEqual({ cpu: '1000m' });
     expect(result.env).toEqual({ PATH: '/usr/bin' });
     expect(result.volumes).toEqual([{ name: 'data', hostPath: '/mnt/data' }]);
+  });
+
+  test('converts API millicpu/MiB resources to suffixed quantities', () => {
+    const image = {
+      group: 'g',
+      name: 'n',
+      resources: { cpu: 2000, memory: 2048, ephemeral_storage: 512, burstable: { cpu: 4000, memory: 4096 } },
+    };
+    expect(imageToEditorObject(image).resources).toEqual({
+      cpu: '2000m',
+      memory: '2048Mi',
+      ephemeral_storage: '512Mi',
+      burstable: { cpu: '4000m', memory: '4096Mi' },
+    });
   });
 
   test('returns empty object for image with only read-only fields', () => {
@@ -164,6 +178,27 @@ describe('editorObjectToImageUpdate', () => {
     const result = editorObjectToImageUpdate({}, ORIGINAL)!;
     expect(result.data).not.toHaveProperty('image');
     expect(result.data).not.toHaveProperty('timeout');
+  });
+
+  describe('resources', () => {
+    const original = { group: 'g', name: 'n', resources: { cpu: 1000, memory: 2048, nvidia_gpu: 0, amd_gpu: 0 } };
+
+    test('does not send resources when the editor object was only seeded from the image', () => {
+      const result = editorObjectToImageUpdate(imageToEditorObject(original), original)!;
+      expect(result.data).not.toHaveProperty('resources');
+    });
+
+    test('does not send resources when a quantity is just spelled differently', () => {
+      const obj = { ...imageToEditorObject(original), resources: { cpu: '1', memory: '2Gi', nvidia_gpu: 0, amd_gpu: 0 } };
+      const result = editorObjectToImageUpdate(obj, original)!;
+      expect(result.data).not.toHaveProperty('resources');
+    });
+
+    test('sends unit-suffixed quantities when resources change', () => {
+      const obj = { ...imageToEditorObject(original), resources: { cpu: '2', memory: '4Gi' } };
+      const result = editorObjectToImageUpdate(obj, original)!;
+      expect(result.data.resources).toEqual({ cpu: '2', memory: '4Gi' });
+    });
   });
 
   describe('description handling', () => {

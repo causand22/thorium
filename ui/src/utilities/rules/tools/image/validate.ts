@@ -18,6 +18,7 @@ import {
 } from '../shared';
 import { Severity, type Diagnostic } from '../../types';
 import { buildLineIndex, type LineIndex } from '../../yaml';
+import { cpuError, memoryError } from '../../../resources';
 import {
   REQUIRED_IMAGE_FIELDS,
   KNOWN_IMAGE_FIELDS,
@@ -67,6 +68,22 @@ function validateSecurityContext(parentMap: unknown, parsed: Record<string, unkn
   validateBooleanField(subMap, obj, 'allow_privilege_escalation', lineIndex, diagnostics);
 }
 
+/** Report a diagnostic if `field` is present and `validator` rejects its value. */
+function validateQuantityField(
+  map: unknown,
+  parsed: Record<string, unknown>,
+  field: string,
+  validator: (raw: unknown) => string | null,
+  lineIndex: LineIndex,
+  diagnostics: Diagnostic[],
+) {
+  if (!(field in parsed)) return;
+  const message = validator(parsed[field]);
+  if (!message) return;
+  const pos = nodePosition(findMapValue(map, field), lineIndex);
+  diagnostics.push({ ...pos, severity: Severity.Error, message: `'${field}': ${message}` });
+}
+
 function validateResources(
   parentMap: unknown,
   parsed: Record<string, unknown>,
@@ -78,9 +95,10 @@ function validateResources(
   if (!obj) return;
   const subMap = findMapValue(parentMap, 'resources');
   validateUnknownFields(subMap, KNOWN_RESOURCES_FIELDS, 'resources', obj, lineIndex, diagnostics);
-  const numFields = isK8s
-    ? (['cpu', 'memory', 'ephemeral_storage', 'worker_slots', 'nvidia_gpu', 'amd_gpu'] as const)
-    : (['cpu', 'memory', 'ephemeral_storage', 'worker_slots'] as const);
+  validateQuantityField(subMap, obj, 'cpu', cpuError, lineIndex, diagnostics);
+  validateQuantityField(subMap, obj, 'memory', memoryError, lineIndex, diagnostics);
+  validateQuantityField(subMap, obj, 'ephemeral_storage', memoryError, lineIndex, diagnostics);
+  const numFields = isK8s ? (['worker_slots', 'nvidia_gpu', 'amd_gpu'] as const) : (['worker_slots'] as const);
   for (const numField of numFields) {
     validateNumberField(subMap, obj, numField, lineIndex, diagnostics);
   }
@@ -89,8 +107,8 @@ function validateResources(
     if (burst) {
       const burstMap = findMapValue(subMap, 'burstable');
       validateUnknownFields(burstMap, KNOWN_BURSTABLE_FIELDS, 'burstable', burst, lineIndex, diagnostics);
-      validateNumberField(burstMap, burst, 'cpu', lineIndex, diagnostics);
-      validateNumberField(burstMap, burst, 'memory', lineIndex, diagnostics);
+      validateQuantityField(burstMap, burst, 'cpu', cpuError, lineIndex, diagnostics);
+      validateQuantityField(burstMap, burst, 'memory', memoryError, lineIndex, diagnostics);
     }
   }
 }

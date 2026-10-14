@@ -32,6 +32,7 @@ import { useAuth } from '@utilities/auth';
 import { ImageChecker } from '@utilities/rules/tools/image';
 import { imageToEditorObject, editorObjectToImageCreate } from '@utilities/transforms/image';
 import { createImage, listImageDetails } from '@thorpi/images';
+import { validateResourceQuantities } from '@utilities/resources';
 import type {
   Image,
   ImageArgs,
@@ -157,6 +158,12 @@ const ImageCreate: React.FC = () => {
         return;
       }
       setCreateImageErrors('');
+    }
+
+    const resourceError = Object.values(validateResourceQuantities(editorObj.resources))[0];
+    if (resourceError) {
+      setCreateImageErrors(resourceError);
+      return;
     }
 
     const data = editorObjectToImageCreate(editorObj);

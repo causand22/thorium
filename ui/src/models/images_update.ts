@@ -78,13 +78,17 @@ export interface ImageUpdate {
   network_policies?: ImageNetworkPolicyUpdate;
 }
 
+/**
+ * Quantities are sent as unit-suffixed strings: cpu is cores (`2`) or millicores (`500m`), and
+ * memory/storage are `Mi` or `Gi` (`512Mi`, `2Gi`).
+ */
 export interface ResourcesUpdate {
-  /** CPU cores in millicpus */
-  cpu?: number | null;
-  /** RAM in mebibytes */
-  memory?: number | null;
-  /** Ephemeral storage in mebibytes */
-  ephemeral_storage?: number | null;
+  /** CPU in cores (`2`) or millicores (`500m`) */
+  cpu?: number | string | null;
+  /** RAM with a `Mi` or `Gi` suffix */
+  memory?: number | string | null;
+  /** Ephemeral storage with a `Mi` or `Gi` suffix */
+  ephemeral_storage?: number | string | null;
   /** The total number of Nvidia GPUs */
   nvidia_gpu?: number | null;
   /** The total number of AMD GPUs */
@@ -94,8 +98,8 @@ export interface ResourcesUpdate {
 }
 
 export interface BurstableResourcesUpdate {
-  cpu?: number | null;
-  memory?: number | null;
+  cpu?: number | string | null;
+  memory?: number | string | null;
 }
 
 /** Limits for how many workers of an image type can be spawned */

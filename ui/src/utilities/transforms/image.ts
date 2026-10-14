@@ -8,7 +8,6 @@ import {
   GenericCacheDependencySettings,
   ImageArgs,
   RepoDependencySettings,
-  Resources,
   ResultDependencySettings,
   SampleDependencySettings,
   SecurityContext,
@@ -30,6 +29,7 @@ import {
   SecurityContextUpdate,
   TagDependencySettingsUpdate,
 } from '@models/images_update';
+import { canonicalResources, resourcesToEditor, type EditorResources } from '@utilities/resources';
 
 const READ_ONLY_FIELDS = ['creator', 'runtime', 'used_by', 'bans'];
 const OPTIONAL_STRING_FIELDS = ['image', 'modifiers', 'description'];
@@ -55,6 +55,8 @@ const SIMPLE_UPDATE_FIELDS = [
  *
  * Drops server-managed read-only fields ({@link READ_ONLY_FIELDS}) and coerces `null` optional
  * string fields to `''` so they render as empty editable inputs rather than literal `null`.
+ * Resources are converted from the API's integer millicpu/MiB to unit-suffixed quantities
+ * (`1000m`, `2048Mi`) so the form and editor views agree on units.
  *
  * @param image - The image as returned by the API.
  * @returns A new object suitable for populating the editor.
@@ -64,7 +66,8 @@ export function imageToEditorObject(image: Record<string, unknown>): Record<stri
   for (const key of Object.keys(image)) {
     if (READ_ONLY_FIELDS.includes(key)) continue;
     const val = image[key];
-    obj[key] = val === null && OPTIONAL_STRING_FIELDS.includes(key) ? '' : val;
+    if (key === 'resources') obj[key] = resourcesToEditor(val);
+    else obj[key] = val === null && OPTIONAL_STRING_FIELDS.includes(key) ? '' : val;
   }
   return obj;
 }
@@ -286,8 +289,9 @@ export function editorObjectToImageUpdate(
     }
   }
 
-  if (!valuesEqual(obj['resources'], originalImage.resources)) {
-    const resources = toResourcesUpdate(obj['resources'] as Resources | Partial<Resources> | undefined);
+  // compare by amount so a different spelling of the same quantity (1 vs 1000m) isn't a change
+  if (!valuesEqual(canonicalResources(obj['resources']), canonicalResources(resourcesToEditor(originalImage.resources)))) {
+    const resources = toResourcesUpdate(obj['resources'] as EditorResources | undefined);
     if (resources) data.resources = resources;
   }
   const args = toImageArgsUpdate(obj['args'] as Partial<ImageArgs> | undefined, originalImage.args as Partial<ImageArgs> | undefined);
@@ -345,7 +349,7 @@ export function editorObjectToImageUpdate(
   return { group, name, data };
 }
 
-function toResourcesUpdate(resources: Resources | Partial<Resources> | undefined): ResourcesUpdate | undefined {
+function toResourcesUpdate(resources: EditorResources | undefined): ResourcesUpdate | undefined {
   if (!resources) return undefined;
 
   const update: ResourcesUpdate = {};
