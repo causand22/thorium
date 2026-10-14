@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 
 // project imports
 import { clausesEqual, dedupeAppend, seedHasResources } from './Dashboard';
-import { ClauseCondition, type Clause } from '@components/shared/inputs/omnibar/ClauseTypes';
+import { ClauseCondition, type Clause } from '@components/shared/inputs/omnibar/clauses/ClauseTypes';
 import type { Seed } from '@models/trees';
 
 // a single-value clause helper for terse test construction

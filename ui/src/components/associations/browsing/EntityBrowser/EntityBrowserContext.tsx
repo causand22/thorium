@@ -26,8 +26,8 @@ import { useGraphData } from '../../data/GraphDataContext';
 import { computeDistances } from '../../data/graphMerge';
 import { getNodeName } from '../../utilities';
 import { useSharedTreeIndex } from '../../data/SharedTreeIndex';
-import { Clause } from '@components/shared/inputs/omnibar/ClauseTypes';
-import { getSearchTextFromClauses, getStringFieldListFromClauses, getTagsFromClauses } from '@components/shared/inputs/omnibar/utils';
+import { Clause } from '@components/shared/inputs/omnibar/clauses/ClauseTypes';
+import { getStringFieldListFromClauses, getTagsFromClauses, getTextFromClauses } from '@components/shared/inputs/omnibar/clauses/utils';
 import { TagOptions } from '@models/tags';
 import { NodeType } from '@models/trees';
 import { Confidence } from '@models/entities';
@@ -454,7 +454,8 @@ export const EntityBrowserProvider: React.FC<EntityBrowserProviderProps> = ({
     },
     [graph],
   );
-  const text = useMemo(() => getSearchTextFromClauses(clauses), [clauses]);
+  // raw text, not the quoted Lucene form: this feeds client-side node matching, not Elasticsearch
+  const text = useMemo(() => getTextFromClauses(clauses).join(' '), [clauses]);
   const tags = useMemo(() => getTagsFromClauses(clauses), [clauses]);
   const groups = useMemo(() => getStringFieldListFromClauses(clauses, 'group'), [clauses]);
 

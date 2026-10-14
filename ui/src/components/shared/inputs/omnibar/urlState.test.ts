@@ -1,21 +1,34 @@
 import { describe, it, expect } from 'vitest';
 
 // project imports
-import { Clause, ClauseCondition, DefaultClausesEntities } from './ClauseTypes';
+import { Clause, ClauseCondition, DEFAULT_HIDDEN_TAGS } from './clauses/ClauseTypes';
 import { AbsoluteSelection, RelativeSelection, TimeSelection } from './timepicker/utils';
-import { clausesAndTimeToParams, clausesCodec, paramsToClauses, paramsToClausesAndTime, paramsToTime } from './urlState';
+import {
+  clausesAndTimeToParams,
+  clausesCodec,
+  defaultOmnibarSettings,
+  paramsToClauses,
+  paramsToClausesAndTime,
+  paramsToSettings,
+  paramsToTime,
+  settingsCodec,
+  settingsToParams,
+} from './urlState';
 
 const single = (category: string, field: string, value: string, condition = ClauseCondition.Is): Clause =>
   ({ category, field, condition, value: { value } }) as Clause;
 const multi = (category: string, field: string, values: string[], condition = ClauseCondition.IsOneOf): Clause =>
   ({ category, field, condition, value: { values } }) as Clause;
 
-const NO_DEFAULTS = { clauses: [] as Clause[], time: { mode: 'all' } as TimeSelection };
+const NO_DEFAULTS = { clauses: [] as Clause[], time: { mode: 'all' } as TimeSelection, settings: defaultOmnibarSettings() };
+
+/** Defaults for a page that hides the standard tag keys, e.g. entity browsing. */
+const HIDING_DEFAULTS = { ...defaultOmnibarSettings(), hiddenTags: DEFAULT_HIDDEN_TAGS };
 
 // encode -> decode and compare the resulting clause set, order-insensitively
-function roundTripClauses(clauses: Clause[], defaultClauses: Clause[] = []): Clause[] {
+function roundTripClauses(clauses: Clause[]): Clause[] {
   const params = clausesAndTimeToParams(clauses, { mode: 'all' });
-  return paramsToClauses(params, defaultClauses);
+  return paramsToClauses(params);
 }
 
 describe('clause url round-trips', () => {
@@ -41,13 +54,17 @@ describe('clause url round-trips', () => {
     expect(paramsToClauses(params)).toEqual([single('tag', 'family', 'emotet')]);
   });
 
-  it('round-trips limit', () => {
-    expect(roundTripClauses([single('limit', 'limit', '50')])).toEqual([single('limit', 'limit', '50')]);
+  it('routes a negated clause through the generic fallback, which carries the condition', () => {
+    const clauses = [single('tag', 'arch', 'x86', ClauseCondition.IsNot)];
+    const params = clausesAndTimeToParams(clauses, { mode: 'all' });
+    expect(params.getAll('c')).toHaveLength(1);
+    expect(params.getAll('tags[arch]')).toEqual([]);
+    expect(paramsToClauses(params)).toEqual(clauses);
   });
 
-  it('round-trips hidden tags as a single `Are` clause', () => {
-    const out = roundTripClauses([multi('hidden tags', 'hidden tags', ['Results', 'Parent'], ClauseCondition.Are)]);
-    expect(out).toEqual([multi('hidden tags', 'hidden tags', ['Results', 'Parent'], ClauseCondition.Are)]);
+  it('routes a substring clause through the generic fallback', () => {
+    const clauses = [single('name', 'name', 'unpack', ClauseCondition.Includes)];
+    expect(roundTripClauses(clauses)).toEqual(clauses);
   });
 
   it('round-trips arbitrary fields through the generic fallback', () => {
@@ -63,56 +80,64 @@ describe('clause url round-trips', () => {
   });
 });
 
-describe('default merging', () => {
-  it('injects default hidden tags when the URL has no hide param', () => {
-    const defaults = DefaultClausesEntities();
-    const out = paramsToClauses(new URLSearchParams('groups=corp'), defaults);
-    expect(out).toContainEqual(single('group', 'group', 'corp'));
-    expect(out.some((c) => c.field === 'hidden tags')).toBe(true);
+describe('clause decoding', () => {
+  it('an empty URL yields no clauses', () => {
+    expect(paramsToClauses(new URLSearchParams(''))).toEqual([]);
   });
 
-  it('does not override an explicit hide param with defaults', () => {
-    const out = paramsToClauses(new URLSearchParams('hide=OnlyThis'), DefaultClausesEntities());
-    const hidden = out.filter((c) => c.field === 'hidden tags');
-    expect(hidden).toHaveLength(1);
-    expect(hidden[0].value).toEqual({ values: ['OnlyThis'] });
-  });
-
-  it('an empty URL with no defaults yields no clauses', () => {
-    expect(paramsToClauses(new URLSearchParams(''), [])).toEqual([]);
+  it('decodes repeated tags[KEY] values as separate clauses, matching the AND the backend performs', () => {
+    const out = paramsToClauses(new URLSearchParams('tags[arch]=x86&tags[arch]=arm'));
+    expect(out).toEqual([single('tag', 'arch', 'x86'), single('tag', 'arch', 'arm')]);
   });
 });
 
-describe('cleared hidden tags (nohide sentinel)', () => {
-  it('emits nohide=1 when defaults have hidden tags but the cleared state has none', () => {
-    const codec = clausesCodec(DefaultClausesEntities());
+// hidden tags moved from the clause codec to the settings codec, but keep the same param names so
+// existing shared links keep resolving (SPEC §10, §12)
+describe('hidden tags (settings codec, nohide sentinel)', () => {
+  it('emits hide params for a non-default set', () => {
     const params = new URLSearchParams();
-    codec.encode([], params); // user cleared all clauses including the default hidden tags
+    settingsToParams({ ...HIDING_DEFAULTS, hiddenTags: ['OnlyThis'] }, params, HIDING_DEFAULTS);
+    expect(params.getAll('hide')).toEqual(['OnlyThis']);
+  });
+
+  it('emits nohide=1 when the defaults hide tags but the user cleared them', () => {
+    const params = new URLSearchParams();
+    settingsToParams({ ...HIDING_DEFAULTS, hiddenTags: [] }, params, HIDING_DEFAULTS);
     expect(params.get('nohide')).toBe('1');
   });
 
   it('does not re-inject defaults when nohide is present', () => {
-    const out = paramsToClauses(new URLSearchParams('nohide=1'), DefaultClausesEntities());
-    expect(out.some((c) => c.field === 'hidden tags')).toBe(false);
+    expect(paramsToSettings(new URLSearchParams('nohide=1'), HIDING_DEFAULTS).hiddenTags).toEqual([]);
   });
 
-  it('round-trips a cleared state back to no hidden tags', () => {
-    const codec = clausesCodec(DefaultClausesEntities());
+  it('does not override an explicit hide param with defaults', () => {
+    expect(paramsToSettings(new URLSearchParams('hide=OnlyThis'), HIDING_DEFAULTS).hiddenTags).toEqual(['OnlyThis']);
+  });
+
+  it('injects defaults for a fresh (empty) URL', () => {
+    expect(paramsToSettings(new URLSearchParams(), HIDING_DEFAULTS).hiddenTags).toEqual(DEFAULT_HIDDEN_TAGS);
+  });
+
+  it('never emits nohide for pages whose defaults hide nothing', () => {
+    const defaults = defaultOmnibarSettings();
     const params = new URLSearchParams();
-    codec.encode([], params);
-    expect((codec.decode(params) ?? []).some((c) => c.field === 'hidden tags')).toBe(false);
+    settingsToParams(defaults, params, defaults);
+    expect(params.get('nohide')).toBeNull();
   });
 
-  it('still injects defaults for a fresh (empty) URL', () => {
-    const codec = clausesCodec(DefaultClausesEntities());
-    expect((codec.decode(new URLSearchParams()) ?? []).some((c) => c.field === 'hidden tags')).toBe(true);
+  it('round-trips a cleared state through the settings codec', () => {
+    const codec = settingsCodec(HIDING_DEFAULTS);
+    const params = new URLSearchParams();
+    codec.encode({ ...HIDING_DEFAULTS, hiddenTags: [] }, params);
+    expect(codec.decode(params)?.hiddenTags).toEqual([]);
   });
 
-  it('never emits nohide for pages whose defaults have no hidden tags', () => {
-    const codec = clausesCodec([]);
+  it('is no longer owned by the clause codec', () => {
+    const codec = clausesCodec();
     const params = new URLSearchParams();
     codec.encode([], params);
     expect(params.get('nohide')).toBeNull();
+    expect(codec.keys(new URLSearchParams())).not.toContain('hide');
   });
 });
 
@@ -169,11 +194,50 @@ describe('time url round-trips', () => {
   });
 });
 
+describe('settings url round-trips', () => {
+  it('encodes defaults to nothing and decodes back to defaults', () => {
+    const defaults = defaultOmnibarSettings();
+    const params = new URLSearchParams();
+    settingsToParams(defaults, params, defaults);
+    expect(params.toString()).toBe('');
+    expect(paramsToSettings(params, defaults)).toEqual(defaults);
+  });
+
+  it('round-trips a non-default limit', () => {
+    const defaults = defaultOmnibarSettings();
+    const params = new URLSearchParams();
+    settingsToParams({ ...defaults, limit: 100 }, params, defaults);
+    expect(params.get('limit')).toBe('100');
+    expect(paramsToSettings(params, defaults)).toEqual({ ...defaults, limit: 100 });
+  });
+
+  it('round-trips a non-default case-sensitivity flag', () => {
+    const defaults = defaultOmnibarSettings();
+    const params = new URLSearchParams();
+    settingsToParams({ ...defaults, tagsCaseInsensitive: !defaults.tagsCaseInsensitive }, params, defaults);
+    expect(paramsToSettings(params, defaults)).toEqual({ ...defaults, tagsCaseInsensitive: !defaults.tagsCaseInsensitive });
+  });
+
+  it('falls back to defaults for an unparseable limit', () => {
+    const defaults = defaultOmnibarSettings();
+    expect(paramsToSettings(new URLSearchParams('limit=abc'), defaults)).toEqual(defaults);
+  });
+
+  it('a codec round-trip via encode/decode matches the original settings', () => {
+    const defaults = defaultOmnibarSettings();
+    const codec = settingsCodec(defaults);
+    const settings = { limit: 50, tagsCaseInsensitive: !defaults.tagsCaseInsensitive, hiddenTags: ['Results'] };
+    const params = new URLSearchParams();
+    codec.encode(settings, params);
+    expect(codec.decode(params)).toEqual(settings);
+  });
+});
+
 describe('legacy link compatibility', () => {
-  it('decodes a TagBadge link (?tags[KEY]=v&limit=10)', () => {
+  it('decodes a TagBadge link (?tags[KEY]=v); `limit` is ignored by the clause codec (owned by settings)', () => {
     const out = paramsToClauses(new URLSearchParams('tags[av]=malicious&limit=10'));
     expect(out).toContainEqual(single('tag', 'av', 'malicious'));
-    expect(out).toContainEqual(single('limit', 'limit', '10'));
+    expect(out.some((c) => c.field === 'limit')).toBe(false);
   });
 
   it('decodes a buildCollectionsBrowsingUrl link (groups + tags + start/end)', () => {

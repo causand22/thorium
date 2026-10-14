@@ -24,7 +24,7 @@ import { toggleTagValue } from './tagFilter';
 import { getNodeColor } from '@components/associations/graph/styles';
 import { VisualState } from '@components/associations/graph/types';
 import { useGraphData } from '@components/associations/data/GraphDataContext';
-import { type Clause } from '@components/shared/inputs/omnibar/ClauseTypes';
+import { type Clause } from '@components/shared/inputs/omnibar/clauses/ClauseTypes';
 import { NodeType, type Seed } from '@models/trees';
 
 /**

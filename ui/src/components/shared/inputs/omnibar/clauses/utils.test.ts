@@ -3,17 +3,18 @@ import { describe, it, expect } from 'vitest';
 // project imports
 import {
   getGroupsFromClauses,
-  getHiddenTagsFromClauses,
   getIndexesFromClauses,
-  getLimitFromClauses,
   getSearchTextFromClauses,
   getStringFieldFromClauses,
   getStringFieldListFromClauses,
   getTagsFromClauses,
+  getTextFromClauses,
   matchesStringClauses,
 } from './utils';
 import { Clause, ClauseCondition } from './ClauseTypes';
 import { ElasticIndex } from '@models/search';
+
+// spec: ../SPEC.md
 
 // helpers to build clauses without repeating the discriminated-union boilerplate
 function single(category: string, field: string, value: string): Clause {
@@ -22,14 +23,40 @@ function single(category: string, field: string, value: string): Clause {
 function multi(category: string, field: string, values: string[]): Clause {
   return { category, field, condition: ClauseCondition.IsOneOf, value: { values } };
 }
+function negated(category: string, field: string, value: string): Clause {
+  return { category, field, condition: ClauseCondition.IsNot, value: { value } };
+}
 
 describe('getSearchTextFromClauses', () => {
-  it('returns empty string when there are no text clauses', () => {
+  it('returns empty string when there are no text or tag clauses', () => {
     expect(getSearchTextFromClauses([single('group', 'group', 'g1')])).toBe('');
   });
 
   it('returns the value of a single text clause', () => {
     expect(getSearchTextFromClauses([single('text', 'text', 'malware')])).toBe('"malware"');
+  });
+
+  it('ANDs text and tag clauses', () => {
+    const clauses = [single('text', 'text', 'malware'), single('tag', 'arch', 'x86')];
+    expect(getSearchTextFromClauses(clauses)).toBe('"malware" AND "arch=x86"');
+  });
+
+  it('emits NOT for a negated tag clause', () => {
+    expect(getSearchTextFromClauses([negated('tag', 'arch', 'x86')])).toBe('NOT "arch=x86"');
+  });
+
+  it('emits an OR group for a multi-value tag clause', () => {
+    expect(getSearchTextFromClauses([multi('tag', 'arch', ['x86', 'arm'])])).toBe('("arch=x86" OR "arch=arm")');
+  });
+
+  it('escapes quotes so a value cannot break out of its phrase', () => {
+    expect(getSearchTextFromClauses([single('text', 'text', 'say "hi"')])).toBe('"say \\"hi\\""');
+  });
+});
+
+describe('getTextFromClauses', () => {
+  it('returns raw values, unlike the quoted Lucene form', () => {
+    expect(getTextFromClauses([single('text', 'text', 'malware'), single('tag', 'a', 'b')])).toEqual(['malware']);
   });
 });
 
@@ -56,21 +83,6 @@ describe('getIndexesFromClauses', () => {
 
   it('returns [] when no index clause exists', () => {
     expect(getIndexesFromClauses([single('group', 'group', 'g')])).toEqual([]);
-  });
-});
-
-describe('getLimitFromClauses', () => {
-  it('returns the provided default when no limit clause exists', () => {
-    expect(getLimitFromClauses([], 25)).toBe(25);
-    expect(getLimitFromClauses([], 50)).toBe(50);
-  });
-
-  it('parses an integer limit clause', () => {
-    expect(getLimitFromClauses([single('limit', 'limit', '100')], 25)).toBe(100);
-  });
-
-  it('falls back to the default for a non-integer limit', () => {
-    expect(getLimitFromClauses([single('limit', 'limit', 'abc')], 25)).toBe(25);
   });
 });
 
@@ -128,20 +140,6 @@ describe('matchesStringClauses', () => {
   });
 });
 
-describe('getHiddenTagsFromClauses', () => {
-  it('returns the de-duplicated union of hidden-tag multi clauses', () => {
-    const clauses = [
-      multi('hidden tags', 'hidden tags', ['Results', 'Parent']),
-      multi('hidden tags', 'hidden tags', ['Parent', 'submitter']),
-    ];
-    expect(getHiddenTagsFromClauses(clauses)).toEqual(['Results', 'Parent', 'submitter']);
-  });
-
-  it('ignores single-value clauses and returns [] when none present', () => {
-    expect(getHiddenTagsFromClauses([single('text', 'text', 'x')])).toEqual([]);
-  });
-});
-
 describe('getTagsFromClauses', () => {
   it('returns {} when there are no tag clauses', () => {
     expect(getTagsFromClauses([single('group', 'group', 'g1')])).toEqual({});
@@ -161,8 +159,8 @@ describe('getTagsFromClauses', () => {
     expect(getTagsFromClauses(clauses)).toEqual({ av: ['malicious'], os: ['windows', 'linux'] });
   });
 
-  it('excludes the hidden-tags display filter', () => {
-    const clauses = [single('tag', 'family', 'emotet'), multi('hidden tags', 'hidden tags', ['Results', 'Parent'])];
+  it('skips negated clauses, which the list routes have no wire encoding for', () => {
+    const clauses = [single('tag', 'family', 'emotet'), negated('tag', 'arch', 'x86')];
     expect(getTagsFromClauses(clauses)).toEqual({ family: ['emotet'] });
   });
 });

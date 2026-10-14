@@ -11,8 +11,7 @@ import { toggleTagValue } from './tagFilter';
 import Collapsible, { TogglePosition } from '@components/shared/info/Collapsible';
 import { BalancedColumns, BalanceStrategy } from '@components/shared/layout/BalancedColumns';
 import { OverlayTipTop } from '@components/shared/overlay/tips';
-import { ClauseCondition, ClauseIsMulti, type Clause } from '@components/shared/inputs/omnibar/ClauseTypes';
-import { getHiddenTagsFromClauses } from '@components/shared/inputs/omnibar/utils';
+import { ClauseCondition, ClauseIsMulti, type Clause } from '@components/shared/inputs/omnibar/clauses/ClauseTypes';
 import { spacers } from '@styles';
 
 /// Props for {@link TagsTile}.
@@ -25,10 +24,9 @@ export interface TagsTileProps {
   clauses: Clause[];
   /** Setter for the shared {@link clauses}. */
   setClauses: (next: Clause[]) => void;
+  /** Tag keys to exclude from the tally — a display filter held in omnibar settings, not a clause. */
+  hiddenTags: string[];
 }
-
-/// The tag keys that are always hidden even when no `hidden tags` clause is present.
-const DEFAULT_HIDDEN_KEYS = ['Results', 'Parent', 'submitter'];
 
 /// The minimum width (px) of a per-key tag tile; `BalancedColumns` derives the column count from this so
 /// wide screens pack more (narrower) columns while each tile stays only as tall as its content. Tiles are
@@ -174,7 +172,7 @@ TagKeyTile.displayName = 'TagKeyTile';
  *
  * Counts over the entity browser's `visibleSet` when a filter is active (so the tile *downselects* — a
  * value that no longer appears in the filtered view drops out) and over the whole `data_map` otherwise.
- * The display-hidden tag keys (`getHiddenTagsFromClauses`, defaulting to `Results`/`Parent`/`submitter`)
+ * The display-hidden tag keys (the `hiddenTags` omnibar setting, defaulting to `Results`/`Parent`/`submitter`)
  * are excluded, as are the always-hidden high-cardinality keys ({@link ALWAYS_HIDDEN_TAG_KEYS}) which are
  * dropped unconditionally. Clicking a chip toggles its value into the key's single is-one-of filter via
  * {@link toggleTagValue}; already-filtered values render active and sort **first** within their tile so they
@@ -190,18 +188,15 @@ TagKeyTile.displayName = 'TagKeyTile';
  * @param setClauses - Setter for the shared clause list.
  * @returns The tags tile.
  */
-const TagsTile: React.FC<TagsTileProps> = ({ clauses, setClauses }) => {
+const TagsTile: React.FC<TagsTileProps> = ({ clauses, setClauses, hiddenTags }) => {
   // node set = only the visible ids when a filter is active, otherwise every node in the graph (the same
   // downselect the stats charts use, via the shared useVisibleNodes hook)
   const nodes = useVisibleNodes();
 
-  // the set of tag keys to exclude from the tally: the omnibar-derived hidden keys (or the default
-  // fallback) plus the always-hidden high-cardinality keys. Derived in its own memo (on `clauses`) so the
-  // count walk below recomputes only when the *hidden keys* change, not on every unrelated clause edit.
-  const hiddenKeys = useMemo(() => {
-    const fromClauses = getHiddenTagsFromClauses(clauses);
-    return [...(fromClauses.length > 0 ? fromClauses : DEFAULT_HIDDEN_KEYS), ...ALWAYS_HIDDEN_TAG_KEYS];
-  }, [clauses]);
+  // the set of tag keys to exclude from the tally: the settings-held hidden keys plus the always-hidden
+  // high-cardinality keys. Derived in its own memo so the count walk below recomputes only when the
+  // *hidden keys* change, not on every unrelated clause edit.
+  const hiddenKeys = useMemo(() => [...hiddenTags, ...ALWAYS_HIDDEN_TAG_KEYS], [hiddenTags]);
 
   // nodes changes identity only when the graph's data_map or the visible set change; hiddenKeys drives the
   // exclusion set

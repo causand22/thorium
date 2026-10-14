@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 // project imports
 import { collectSampleSha256s, makeIncludeClause } from './deriveStats';
-import { ClauseCondition } from '@components/shared/inputs/omnibar/ClauseTypes';
+import { ClauseCondition } from '@components/shared/inputs/omnibar/clauses/ClauseTypes';
 import { Entities } from '@models/entities';
 import type { Sample } from '@models/files';
 import { TreeNode, TreeNodeKey } from '@models/trees';

@@ -6,7 +6,7 @@ import { ToolbarBar, ToolbarControls } from './EntityBrowser.styled';
 import FlaggedOnlyToggle from './controls/FlaggedOnlyToggle';
 import HiddenNodesControl from './controls/HiddenNodesControl';
 import { buildBrowserOmnibarOptions } from './omnibarOptions';
-import Omnibar from '@components/shared/inputs/omnibar/Omnibar';
+import ClauseEditor from '@components/shared/inputs/omnibar/clauses/ClauseEditor';
 import EntitySortControls from './controls/EntitySortControls';
 import GroupByType from './controls/GroupByType';
 import MinimumConfidence from './controls/MinimumConfidence';
@@ -20,16 +20,14 @@ import MinimumConfidence from './controls/MinimumConfidence';
 const BrowserToolbar = ({ showOmnibar }: { showOmnibar: boolean }) => {
   const { clauses, setClauses, presentKinds, tagOptions, groupOptions } = useEntityBrowser();
 
-  const dropdownOptions = useMemo(
+  const registry = useMemo(
     () => buildBrowserOmnibarOptions(presentKinds, tagOptions, groupOptions),
     [tagOptions, groupOptions, presentKinds],
   );
 
   return (
     <ToolbarBar>
-      {showOmnibar && (
-        <Omnibar clauses={clauses} setClauses={setClauses} dropdownOptions={dropdownOptions} placeholder="Filter entities…" />
-      )}
+      {showOmnibar && <ClauseEditor clauses={clauses} setClauses={setClauses} registry={registry} placeholder="Filter entities…" />}
       <ToolbarControls>
         <HiddenNodesControl />
         <FlaggedOnlyToggle />

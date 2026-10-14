@@ -1,7 +1,7 @@
 // spec: ./SPEC.md
 
 // project imports
-import { ClauseCondition, type Clause } from '@components/shared/inputs/omnibar/ClauseTypes';
+import { ClauseCondition, type Clause } from '@components/shared/inputs/omnibar/clauses/ClauseTypes';
 import { TreeNode, TreeNodeKey } from '@models/trees';
 
 /**

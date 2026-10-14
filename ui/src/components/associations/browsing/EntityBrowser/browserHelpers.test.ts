@@ -20,7 +20,7 @@ import {
   resolveRoots,
 } from './browserHelpers';
 import { FilterCriteria, LayerPolicy, SortMode, TraversalConfig } from './types';
-import { Clause, ClauseCondition } from '@components/shared/inputs/omnibar/ClauseTypes';
+import { Clause, ClauseCondition } from '@components/shared/inputs/omnibar/clauses/ClauseTypes';
 import { AssociationKind } from '@models/associations';
 import { Entities } from '@models/entities';
 import { type BranchNode, Direction, type Graph, NodeType, type TreeNode, TreeNodeKey } from '@models/trees';

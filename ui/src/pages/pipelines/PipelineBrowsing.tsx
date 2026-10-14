@@ -10,10 +10,11 @@ import Page from '@components/pages/Page';
 import { Accordion } from '@components/shared/accordion';
 import { Button, ButtonVariant } from '@components/shared/buttons';
 import { OmnibarPipelines } from '@components/shared/inputs/omnibar/Bars';
-import type { Clause } from '@components/shared/inputs/omnibar/ClauseTypes';
+import type { Clause } from '@components/shared/inputs/omnibar/clauses/ClauseTypes';
 import { defaultTimeSelection } from '@components/shared/inputs/omnibar/timepicker/utils';
+import { defaultOmnibarSettings } from '@components/shared/inputs/omnibar/urlState';
 import { useOmnibarUrlState } from '@components/shared/inputs/omnibar/useOmnibarUrlState';
-import { getGroupsFromClauses, matchesStringClauses } from '@components/shared/inputs/omnibar/utils';
+import { getGroupsFromClauses, matchesStringClauses } from '@components/shared/inputs/omnibar/clauses/utils';
 import NoResultsBanner from '@components/shared/alerts/NoResultsBanner';
 import Title from '@components/shared/titles/Title';
 import LoadingSpinner from '@components/shared/fallback/LoadingSpinner';
@@ -47,8 +48,9 @@ const PipelineBrowsing: FC = () => {
   const navigate = useNavigate();
   // expanded accordion rows + omnibar filters live in the URL so the view is shareable
   // const [activeKeys, setActiveKeys] = useUrlState(listCodec('open'), []);
-  const { clauses, setClauses } = useOmnibarUrlState({ clauses: [], time: defaultTimeSelection() });
+  const { clauses, setClauses } = useOmnibarUrlState({ clauses: [], time: defaultTimeSelection(), settings: defaultOmnibarSettings() });
   const { userInfo } = useAuth();
+
   const [activeKeys, setActiveKeys] = useState<string[]>([]);
   const location = useLocation();
 
@@ -105,7 +107,7 @@ const PipelineBrowsing: FC = () => {
   // the changed pipeline without reloading the whole list or collapsing the open accordion.
   const refreshPipeline = useCallback(
     async (group: string, name: string) => {
-      const fresh = await getPipeline(group, name, () => {});
+      const fresh = await getPipeline(group, name, () => { });
       if (!fresh) return;
 
       queryClient.setQueryData<Pipeline[]>(['pipelines', group, 'details'], (prev = []) =>

@@ -11,10 +11,11 @@ import NoResultsBanner from '@components/shared/alerts/NoResultsBanner';
 import LoadingSpinner from '@components/shared/fallback/LoadingSpinner';
 import { OverlayTipRight, OverlayTipLeft } from '@components/shared/overlay/tips';
 import { OmnibarGroups } from '@components/shared/inputs/omnibar/Bars';
-import { Clause } from '@components/shared/inputs/omnibar/ClauseTypes';
+import { Clause } from '@components/shared/inputs/omnibar/clauses/ClauseTypes';
 import { defaultTimeSelection } from '@components/shared/inputs/omnibar/timepicker/utils';
+import { defaultOmnibarSettings } from '@components/shared/inputs/omnibar/urlState';
 import { useOmnibarUrlState } from '@components/shared/inputs/omnibar/useOmnibarUrlState';
-import { getGroupsFromClauses, getStringFieldListFromClauses } from '@components/shared/inputs/omnibar/utils';
+import { getGroupsFromClauses, getStringFieldListFromClauses } from '@components/shared/inputs/omnibar/clauses/utils';
 import { getAllGroupUsers, groupListToRecord, hasOverlap } from '@utilities/groups';
 import { useAuth } from '@utilities/auth';
 import { listUsersSimple } from '@thorpi/users';
@@ -125,7 +126,7 @@ const CreateGroup = ({ onCreated }: CreateGroupProps) => {
 };
 
 const Groups = () => {
-  const { clauses, setClauses } = useOmnibarUrlState({ clauses: [], time: defaultTimeSelection() });
+  const { clauses, setClauses } = useOmnibarUrlState({ clauses: [], time: defaultTimeSelection(), settings: defaultOmnibarSettings() });
   const { userInfo } = useAuth();
 
   const queryClient = useQueryClient();

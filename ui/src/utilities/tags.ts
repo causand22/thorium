@@ -8,6 +8,9 @@ import { useEffect, useState } from 'react';
 //Type for storing TagOptions to local storage with an expiry time.
 type StorageType = {
   tagCounts: TagOptions;
+  /// Documents carrying each tag key, used to rank the omnibar's tag suggestions. Absent on blobs
+  /// cached before this was recorded, in which case ranking falls back to alphabetical.
+  keyTotals?: Record<string, number>;
   expireTime: number;
 };
 
@@ -18,17 +21,19 @@ const attackTagOptions = String(rawAttackTagDefaults).split('\n');
 const mbcTagOptions = String(rawMbcTagDefaults).split('\n');
 
 /**
- * Custom hook for using tag counts in a component.
+ * Poll local storage until the tag cache is populated, then hand `read` the result.
+ *
+ * The cache is filled asynchronously at app start, so a component mounting first has to wait for it.
  */
-export function useTagCount() {
-  const [tags, setTags] = useState<TagOptions>({});
+function usePolledTagStorage<T>(read: () => T | null, empty: T): T {
+  const [value, setValue] = useState<T>(empty);
 
   useEffect(() => {
     let timeoutFn: ReturnType<typeof setTimeout>;
     const loadDropdownData = () => {
-      const data = loadTagOptionsFromLocalStorage();
+      const data = read();
       if (data) {
-        setTags(data);
+        setValue(data);
       } else {
         timeoutFn = setTimeout(() => {
           loadDropdownData();
@@ -42,25 +47,45 @@ export function useTagCount() {
         clearTimeout(timeoutFn);
       }
     };
+    // `read` is a module-level function; re-running on identity changes would restart the poll
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return tags;
+  return value;
+}
+
+/**
+ * Custom hook for using tag counts in a component.
+ */
+export function useTagCount(): TagOptions {
+  return usePolledTagStorage(loadTagOptionsFromLocalStorage, {});
+}
+
+/**
+ * Documents carrying each tag key, for ranking the omnibar's tag suggestions.
+ *
+ * Empty until the cache has been refreshed at least once since totals started being recorded.
+ */
+export function useTagKeyTotals(): Record<string, number> {
+  return usePolledTagStorage(loadTagKeyTotalsFromLocalStorage, {});
 }
 
 /**
  * Save tag count to local storage.
  * @param {TagOptions} newTagCounts - Tag Options to save
+ * @param {Record<string, number>} keyTotals - Documents carrying each tag key
  *
  * Saves TagOption data to local storage with a timeout
  * Strips out ATT&CK and MBC data (which we can load from the static files)
  * */
-function saveTagCountToLocalStorage(newTagCounts: TagOptions) {
+function saveTagCountToLocalStorage(newTagCounts: TagOptions, keyTotals: Record<string, number>) {
   //strip ATT&CK, MBC. We will add full versions in on load
   const copy = { ...newTagCounts };
   delete copy['ATT&CK'];
   delete copy['MBC'];
   const storageData: StorageType = {
-    tagCounts: newTagCounts,
+    tagCounts: copy,
+    keyTotals: keyTotals,
     expireTime: Date.now(),
   };
   localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(storageData));
@@ -68,16 +93,20 @@ function saveTagCountToLocalStorage(newTagCounts: TagOptions) {
 
 /**
  * Load tags from API. Helper function called from {@link fetchTags}.
+ *
+ * Keeps each key's document total alongside its values: the omnibar ranks its tag suggestions by
+ * frequency, and the count endpoint already returns this.
  * */
 async function loadTagsFromApi() {
   const tagCounts = await countFileTags({ limit: LIMIT }, console.error, null);
   if (tagCounts) {
     const tagOptions: TagOptions = {};
+    const keyTotals: Record<string, number> = {};
     Object.keys(tagCounts.tags).forEach((key) => {
-      const values = Object.keys(tagCounts.tags[key].values);
-      tagOptions[key] = values;
+      tagOptions[key] = Object.keys(tagCounts.tags[key].values);
+      keyTotals[key] = tagCounts.tags[key].total;
     });
-    saveTagCountToLocalStorage(tagOptions);
+    saveTagCountToLocalStorage(tagOptions, keyTotals);
   }
   return null;
 }
@@ -140,6 +169,24 @@ export function loadTagOptionsFromLocalStorage(): TagOptions | null {
   tags['ATT&CK'] = attackTagOptions.filter((item) => item); //remove empty strings
   tags['MBC'] = mbcTagOptions.filter((item) => item);
   return tags;
+}
+
+/**
+ * Retrieve per-key document totals from local storage if they exist.
+ * @returns {Record<string, number> | null} Totals, or null when the cache is absent or corrupted
+ *
+ * Returns an empty map (not null) for a cache written before totals were recorded, so callers stop
+ * waiting for data that will not arrive until the next refresh.
+ * */
+export function loadTagKeyTotalsFromLocalStorage(): Record<string, number> | null {
+  const storageDataString = localStorage.getItem(LOCAL_STORAGE_KEY);
+  if (!storageDataString) return null;
+  try {
+    const storageData = JSON.parse(storageDataString) as StorageType;
+    return storageData.keyTotals ?? {};
+  } catch {
+    return null;
+  }
 }
 
 /**

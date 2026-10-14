@@ -19,8 +19,8 @@ import { useEntityBrowser } from '@components/associations/browsing/EntityBrowse
 import FlaggedOnlyToggle from '@components/associations/browsing/EntityBrowser/controls/FlaggedOnlyToggle';
 import { buildBrowserOmnibarOptions } from '@components/associations/browsing/EntityBrowser/omnibarOptions';
 import Collapsible, { TogglePosition } from '@components/shared/info/Collapsible';
-import Omnibar from '@components/shared/inputs/omnibar/Omnibar';
-import type { Clause } from '@components/shared/inputs/omnibar/ClauseTypes';
+import ClauseEditor from '@components/shared/inputs/omnibar/clauses/ClauseEditor';
+import type { Clause } from '@components/shared/inputs/omnibar/clauses/ClauseTypes';
 
 /// The collapsed height (px) of the expandable filters section: a scrollable, bottom-faded window onto
 /// the tags tile, tall enough to show a couple of tag-key tiles before the "filters" toggle expands it.
@@ -42,12 +42,14 @@ export interface DashboardOmnibarProps {
   clauses: Clause[];
   /** Setter for the shared {@link clauses}. */
   setClauses: (next: Clause[]) => void;
+  /** Tag keys hidden from the tags tile — a display filter held in omnibar settings, not a clause. */
+  hiddenTags: string[];
 }
 
 /**
  * The dashboard's always-shown filter strip, sitting between the stats panel and the content tiles.
  *
- * Renders an {@link Omnibar} bound to the shared clause state, with the active re-root and the hidden nodes
+ * Renders a {@link ClauseEditor} bound to the shared clause state, with the active re-root and the hidden nodes
  * surfaced **inside the omnibar entry field** as removable tiles (via `extraChips`). The re-root tile (gear +
  * label + `×`) leads and clears the view back to the natural roots; each hidden tile (eye-slash + label + `×`)
  * unhides just that node — so both read as first-class filter tiles alongside the clause chips (kind-level
@@ -66,10 +68,10 @@ export interface DashboardOmnibarProps {
  * @param setClauses - Setter for the shared clause list.
  * @returns The omnibar strip.
  */
-const DashboardOmnibar: React.FC<DashboardOmnibarProps> = ({ clauses, setClauses }) => {
+const DashboardOmnibar: React.FC<DashboardOmnibarProps> = ({ clauses, setClauses, hiddenTags }) => {
   const { presentKinds, tagOptions, groupOptions, hiddenNodes, unhideNode, unhideAll, labelForNode, reRoot, setReRoot } =
     useEntityBrowser();
-  const dropdownOptions = useMemo(
+  const registry = useMemo(
     () => buildBrowserOmnibarOptions(presentKinds, tagOptions, groupOptions),
     [presentKinds, tagOptions, groupOptions],
   );
@@ -122,10 +124,10 @@ const DashboardOmnibar: React.FC<DashboardOmnibarProps> = ({ clauses, setClauses
   return (
     <OmnibarStrip>
       <OmnibarStripSlot>
-        <Omnibar
+        <ClauseEditor
           clauses={clauses}
           setClauses={setClauses}
-          dropdownOptions={dropdownOptions}
+          registry={registry}
           placeholder="Filter entities…"
           extraChips={extraChips}
         />
@@ -138,7 +140,7 @@ const DashboardOmnibar: React.FC<DashboardOmnibarProps> = ({ clauses, setClauses
           togglePosition={TogglePosition.Top}
           scrollWhenCollapsed
         >
-          <TagsTile clauses={clauses} setClauses={setClauses} />
+          <TagsTile clauses={clauses} setClauses={setClauses} hiddenTags={hiddenTags} />
         </Collapsible>
       </FiltersSection>
     </OmnibarStrip>

@@ -1,13 +1,12 @@
 // project imports
-import { ClauseCondition, ClauseIsMulti, type Clause } from '@components/shared/inputs/omnibar/ClauseTypes';
+import { ClauseCondition, ClauseIsMulti, type Clause } from '@components/shared/inputs/omnibar/clauses/ClauseTypes';
 
 // spec: ./SPEC.md
 
 /**
  * The omnibar clause `category` for a tag filter.
  *
- * Tag clauses use `category: 'tag'` with `field` set to the tag key; the dashboard merges same-key
- * clicks into a single `IsOneOf` clause under this category.
+ * Tag clauses use `category: 'tag'` with `field` set to the tag key, and hold exactly one value each.
  */
 const TAG_CATEGORY = 'tag';
 
@@ -19,45 +18,30 @@ const TAG_CATEGORY = 'tag';
 const DEPTH_CATEGORY = 'depth';
 
 /**
- * The omnibar clause `field` for the display-only hidden-tags filter.
- *
- * A filter reset keeps this field so the default hidden tags (`Results`/`Parent`/`submitter`) stay
- * hidden after clearing the user's filters.
- */
-const HIDDEN_TAGS_FIELD = 'hidden tags';
-
-/**
  * Whether a clause is any tag clause targeting the given key, regardless of its condition.
  *
- * Matching ignores the exact condition because the omnibar's URL round-trip re-decodes a tag clause
- * with whatever condition its value count implies (`urlState.ts` emits `Is` for a single value and
- * `IsOneOf` for several), so a match keyed on a fixed condition would miss a round-tripped clause and
- * append a duplicate on the next click. Restricting to `category === 'tag'` naturally excludes the
- * `hidden tags` field (category `'hidden tags'`).
- *
- * @param clause - The clause to test.
- * @param key - The tag key the clause's `field` must equal.
- * @returns Whether `clause` is a tag clause targeting `key`.
+ * Matching ignores the exact condition so that a clause arriving from an older link (which may encode
+ * several values as one `is one of`) is still recognised and normalised rather than duplicated.
  */
 function isTagClauseForKey(clause: Clause, key: string): boolean {
   return clause.category === TAG_CATEGORY && clause.field === key;
 }
 
 /**
- * Toggle `value` for the tag `key`, collapsing every existing tag clause for that key into one clause.
+ * Toggle `value` for the tag `key`, emitting one single-valued clause per selected value.
  *
- * The dashboard funnels every tag-value click (stats bars and tag chips) through this helper. Because the
- * omnibar URL round-trip can re-decode a tag clause with a different condition (single-value `Is` vs
- * multi-value `IsOneOf`) and can even leave more than one clause for the same key, this helper is
- * round-trip-robust: it gathers the values from ALL tag clauses for `key` (a single `Is` contributes its
- * one value; a multi clause contributes its whole list), toggles the clicked value across that set (adding
- * it when absent, removing it when present), and rebuilds a single `{category:'tag', field:key,
- * condition:IsOneOf, value:{values:[...]}}` clause. Toggling behaviour:
+ * Each tag value is its own clause because that is what the backend computes: the Scylla census
+ * intersects one bucket stream per key/value pair and requires every one to match, so two values for
+ * one key mean "has both", not "either". Rendering them as one `is one of` chip previously implied an
+ * OR the query never performed.
  *
- * - No clause for `key` yet → a fresh single-value `IsOneOf` clause is appended (order preserved).
- * - One or more clauses for `key` → they collapse into one clause at the position of the FIRST such
- *   clause, with the clicked value toggled; any further duplicate clauses for `key` are dropped.
- * - The toggle empties the value set → the clause is removed entirely (no empty `IsOneOf` lingers).
+ * The helper is round-trip-robust: it gathers the values from ALL tag clauses for `key` (including a
+ * legacy multi-value clause from an older link), toggles the clicked value across that set, and
+ * rebuilds the result as single-valued clauses at the position of the FIRST such clause. Toggling:
+ *
+ * - No clause for `key` yet → a fresh single-value clause is appended (order preserved).
+ * - One or more clauses for `key` → they collapse to the toggled set at the first clause's position.
+ * - The toggle empties the value set → every clause for `key` is removed.
  *
  * All non-matching clauses (and their order) are preserved.
  *
@@ -67,44 +51,41 @@ function isTagClauseForKey(clause: Clause, key: string): boolean {
  * @returns A new clause list with `value` toggled for `key`.
  */
 export function toggleTagValue(clauses: Clause[], key: string, value: string): Clause[] {
+  const tagClause = (tagValue: string): Clause => ({
+    category: TAG_CATEGORY,
+    field: key,
+    condition: ClauseCondition.Is,
+    value: { value: tagValue },
+  });
+
   const firstMatchIndex = clauses.findIndex((clause) => isTagClauseForKey(clause, key));
-  // no clause for this key yet: append a fresh single-value IsOneOf clause, preserving order
+  // no clause for this key yet: append a fresh single-value clause, preserving order
   if (firstMatchIndex === -1) {
-    const created: Clause = {
-      category: TAG_CATEGORY,
-      field: key,
-      condition: ClauseCondition.IsOneOf,
-      value: { values: [value] },
-    };
-    return [...clauses, created];
+    return [...clauses, tagClause(value)];
   }
-  // gather the values from every tag clause for this key (single Is -> [value], multi -> values),
-  // deduping so a value carried by several round-tripped clauses is counted once
+
+  // gather the values from every tag clause for this key, deduping so a value carried by several
+  // round-tripped clauses is counted once
   const values: string[] = [];
   for (const clause of clauses) {
-    if (!isTagClauseForKey(clause, key)) {
-      continue;
-    }
-    const clauseValues = ClauseIsMulti(clause) ? clause.value.values : [clause.value.value];
-    for (const clauseValue of clauseValues) {
-      if (!values.includes(clauseValue)) {
-        values.push(clauseValue);
-      }
+    if (!isTagClauseForKey(clause, key)) continue;
+    for (const clauseValue of ClauseIsMulti(clause) ? clause.value.values : [clause.value.value]) {
+      if (!values.includes(clauseValue)) values.push(clauseValue);
     }
   }
+
   // toggle the clicked value across the merged set: remove it if present, otherwise add it
   const nextValues = values.includes(value) ? values.filter((existing) => existing !== value) : [...values, value];
-  // rebuild the collapsed clause at the first match's position, dropping any later duplicate clauses for
-  // the key; an empty value set removes the clause entirely
+
+  // rebuild at the first match's position as one clause per value, dropping later duplicates
   const result: Clause[] = [];
   clauses.forEach((clause, index) => {
     if (!isTagClauseForKey(clause, key)) {
       result.push(clause);
       return;
     }
-    // only the first match slot is (potentially) rewritten; later duplicates are dropped
-    if (index === firstMatchIndex && nextValues.length > 0) {
-      result.push({ category: TAG_CATEGORY, field: key, condition: ClauseCondition.IsOneOf, value: { values: nextValues } });
+    if (index === firstMatchIndex) {
+      result.push(...nextValues.map(tagClause));
     }
   });
   return result;
@@ -114,13 +95,13 @@ export function toggleTagValue(clauses: Clause[], key: string, value: string): C
  * Return only the clauses to keep when the user resets the dashboard filters.
  *
  * A reset clears the user's downselecting filters (tag filters, `Include` kind whitelists, free text,
- * etc.) but keeps two structural clauses so the graph shape and default hidden tags survive: any `depth`
- * clause (the crawl depth) and the `hidden tags` clause (the default display-hidden tag keys). Clause
- * order among the kept clauses is preserved.
+ * etc.) but keeps the structural `depth` clause so the graph shape survives. Hidden tags are no longer
+ * a clause — they live in omnibar settings — so a reset leaves them alone by construction. Clause order
+ * among the kept clauses is preserved.
  *
  * @param clauses - The current clause list.
  * @returns The subset of `clauses` to retain after a reset.
  */
 export function resetFilterClauses(clauses: Clause[]): Clause[] {
-  return clauses.filter((clause) => clause.category === DEPTH_CATEGORY || clause.field === HIDDEN_TAGS_FIELD);
+  return clauses.filter((clause) => clause.category === DEPTH_CATEGORY);
 }

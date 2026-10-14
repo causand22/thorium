@@ -1,92 +1,119 @@
 import { useAuth } from '@utilities/auth';
 import Omnibar from './Omnibar';
-import { useTagCount } from '@utilities/tags';
-import { Clause, ClauseCondition } from './ClauseTypes';
+import { useTagCount, useTagKeyTotals } from '@utilities/tags';
+import { Clause, ClauseCondition } from './clauses/ClauseTypes';
 import {
   addGroupOptions,
-  addHideTagOptions,
   addIndexOptions,
-  addLimitOptions,
   addStringOption,
   addTagOptions,
   addTextOptions,
-  OmnibarOptionMap,
-} from './options';
+  emptyRegistry,
+} from './clauses/options';
+import { OmnibarSettings } from './urlState';
 import { TimeSelection } from './timepicker/utils';
-import styled from 'styled-components';
 import { Group, GroupUserCategory } from '@models/groups';
 import { getAllGroupUsers } from '@utilities/groups';
 import { Pipeline } from '@models/pipelines';
 import { Image } from '@models/images';
 import { RoleKey, UserInfo } from '@models/users';
-import SingleTimePicker from './timepicker/SingleTimePicker';
 
 // spec: ./SPEC.md
+
+/**
+ * Conditions available to a key the page filters itself, in the browser. These pages hold the whole
+ * list in memory, so unlike the Scylla-backed bars they can negate and substring-match freely.
+ *
+ * Order matters: the first condition is the key's default operator in the dropdown. Name-ish fields
+ * lead with `Includes` so picking one offers partial matching, which is the common intent there.
+ */
+const CLIENT_SIDE_TEXT = [ClauseCondition.Includes, ClauseCondition.Is, ClauseCondition.IsNot];
+const CLIENT_SIDE_LIST = [ClauseCondition.Is, ClauseCondition.IsOneOf, ClauseCondition.IsNot];
 
 type OmnibarTimeContainerProps = {
   clauses: Clause[];
   setClauses: (next: Clause[]) => void;
   time: TimeSelection;
   setTime: (next: TimeSelection) => void;
+  settings: OmnibarSettings;
+  setSettings: (next: OmnibarSettings) => void;
 };
 
-const OmnibarWrapperContainer = styled.div`
-  max-width: 1000px;
-  width: 100%;
-  display: flex;
-  justify-content: center;
-  position: relative;
-  margin-bottom: 20px;
-`;
-
-export const OmnibarMainSearch: React.FC<OmnibarTimeContainerProps> = ({ clauses, setClauses, time, setTime }) => {
+/**
+ * The main search bar, backed by Elasticsearch (`/api/search/`).
+ *
+ * The only bar where tags can be negated: the query reaches Elastic as a Lucene `query_string`, which
+ * supports `NOT`, whereas the Scylla list routes can only intersect census buckets.
+ */
+export const OmnibarMainSearch: React.FC<OmnibarTimeContainerProps> = ({
+  clauses,
+  setClauses,
+  time,
+  setTime,
+  settings,
+  setSettings,
+}) => {
   const { userInfo } = useAuth();
   const userInfoGroups = userInfo !== null ? userInfo.groups : [];
   const tagOptions = useTagCount();
+  const keyTotals = useTagKeyTotals();
 
-  let dropdownOptions: OmnibarOptionMap = {};
-  dropdownOptions = addGroupOptions(dropdownOptions, userInfoGroups);
-  dropdownOptions = addIndexOptions(dropdownOptions);
-  dropdownOptions = addTagOptions(dropdownOptions, tagOptions);
-  dropdownOptions = addTextOptions(dropdownOptions);
-  dropdownOptions = addLimitOptions(dropdownOptions);
+  let registry = emptyRegistry();
+  registry = addGroupOptions(registry, userInfoGroups);
+  registry = addIndexOptions(registry);
+  registry = addTagOptions(registry, tagOptions, { negatable: true, keyTotals });
+  registry = addTextOptions(registry);
 
   return (
-    <OmnibarWrapperContainer>
-      <Omnibar
-        clauses={clauses}
-        dropdownOptions={dropdownOptions}
-        setClauses={setClauses}
-        placeholder="Search..."
-        timepickerVisible={true}
-      />
-      <SingleTimePicker time={time} setTime={setTime} />
-    </OmnibarWrapperContainer>
+    <Omnibar
+      clauses={clauses}
+      registry={registry}
+      setClauses={setClauses}
+      placeholder="Search..."
+      time={time}
+      setTime={setTime}
+      settings={settings}
+      setSettings={setSettings}
+      hiddenTagOptions={Object.keys(tagOptions)}
+    />
   );
 };
 
-export const OmnibarStandardTimeFilters: React.FC<OmnibarTimeContainerProps> = ({ clauses, setClauses, time, setTime }) => {
+/**
+ * The browse/filter bar for files, repos and entities, backed by the Scylla list routes.
+ *
+ * Tags here can neither be negated nor OR'd — the census intersects one bucket stream per key/value
+ * pair and requires every one to match.
+ */
+export const OmnibarStandardTimeFilters: React.FC<OmnibarTimeContainerProps> = ({
+  clauses,
+  setClauses,
+  time,
+  setTime,
+  settings,
+  setSettings,
+}) => {
   const { userInfo } = useAuth();
   const userInfoGroups = userInfo !== null ? userInfo.groups : [];
   const tagOptions = useTagCount();
+  const keyTotals = useTagKeyTotals();
 
-  let dropdownOptions: OmnibarOptionMap = {};
-  dropdownOptions = addGroupOptions(dropdownOptions, userInfoGroups);
-  dropdownOptions = addTagOptions(dropdownOptions, tagOptions);
-  dropdownOptions = addHideTagOptions(dropdownOptions, tagOptions);
-  dropdownOptions = addLimitOptions(dropdownOptions);
+  let registry = emptyRegistry();
+  registry = addGroupOptions(registry, userInfoGroups);
+  registry = addTagOptions(registry, tagOptions, { keyTotals });
 
   return (
-    <OmnibarWrapperContainer>
-      <Omnibar
-        clauses={clauses}
-        dropdownOptions={dropdownOptions}
-        setClauses={setClauses}
-        placeholder="Enter a filter..."
-        timepickerVisible={true}
-      />
-      <SingleTimePicker time={time} setTime={setTime} />
-    </OmnibarWrapperContainer>
+    <Omnibar
+      clauses={clauses}
+      registry={registry}
+      setClauses={setClauses}
+      placeholder="Enter a filter..."
+      time={time}
+      setTime={setTime}
+      settings={settings}
+      setSettings={setSettings}
+      hiddenTagOptions={Object.keys(tagOptions)}
+    />
   );
 };
 
@@ -105,29 +132,13 @@ export function OmnibarGroups({ clauses, setClauses, groups }: OmnibarGroupProps
   const { userInfo } = useAuth();
   const userInfoGroups = userInfo !== null ? userInfo.groups : [];
 
-  let dropdownOptions: OmnibarOptionMap = {};
-  dropdownOptions = addGroupOptions(dropdownOptions, userInfoGroups);
-  dropdownOptions = addStringOption(dropdownOptions, 'Owners', getGroupMemberType(groups, 'owners'), [
-    ClauseCondition.Is,
-    // ClauseCondition.IsNot,
-    ClauseCondition.IsOneOf,
-  ]);
-  dropdownOptions = addStringOption(dropdownOptions, 'Users', getGroupMemberType(groups, 'users'), [
-    ClauseCondition.Is,
-    // ClauseCondition.IsNot,
-    ClauseCondition.IsOneOf,
-  ]);
-  dropdownOptions = addStringOption(dropdownOptions, 'Managers', getGroupMemberType(groups, 'managers'), [
-    ClauseCondition.Is,
-    // ClauseCondition.IsNot,
-    ClauseCondition.IsOneOf,
-  ]);
+  let registry = emptyRegistry();
+  registry = addGroupOptions(registry, userInfoGroups);
+  registry = addStringOption(registry, 'Owners', getGroupMemberType(groups, 'owners'), CLIENT_SIDE_LIST, { orCapable: true });
+  registry = addStringOption(registry, 'Users', getGroupMemberType(groups, 'users'), CLIENT_SIDE_LIST, { orCapable: true });
+  registry = addStringOption(registry, 'Managers', getGroupMemberType(groups, 'managers'), CLIENT_SIDE_LIST, { orCapable: true });
 
-  return (
-    <OmnibarWrapperContainer>
-      <Omnibar clauses={clauses} dropdownOptions={dropdownOptions} setClauses={setClauses} placeholder="Enter a filter..." />
-    </OmnibarWrapperContainer>
-  );
+  return <Omnibar clauses={clauses} registry={registry} setClauses={setClauses} placeholder="Enter a filter..." />;
 }
 
 interface OmnibarPipelineProps {
@@ -144,24 +155,17 @@ export function OmnibarPipelines({ clauses, setClauses, pipelines }: OmnibarPipe
   const { userInfo } = useAuth();
   const userInfoGroups = userInfo !== null ? userInfo.groups : [];
 
-  let dropdownOptions: OmnibarOptionMap = {};
-  dropdownOptions = addGroupOptions(dropdownOptions, userInfoGroups);
-  dropdownOptions = addStringOption(
-    dropdownOptions,
+  let registry = emptyRegistry();
+  registry = addGroupOptions(registry, userInfoGroups);
+  registry = addStringOption(
+    registry,
     'name',
     pipelines.map((p) => p.name),
-    [ClauseCondition.Includes, ClauseCondition.Is],
+    CLIENT_SIDE_TEXT,
   );
-  dropdownOptions = addStringOption(dropdownOptions, 'creator', uniqueSort(pipelines.map((pipeline) => pipeline.creator)), [
-    ClauseCondition.Includes,
-    ClauseCondition.Is,
-  ]);
+  registry = addStringOption(registry, 'creator', uniqueSort(pipelines.map((pipeline) => pipeline.creator)), CLIENT_SIDE_TEXT);
 
-  return (
-    <OmnibarWrapperContainer>
-      <Omnibar clauses={clauses} dropdownOptions={dropdownOptions} setClauses={setClauses} placeholder="Enter a filter..." />
-    </OmnibarWrapperContainer>
-  );
+  return <Omnibar clauses={clauses} registry={registry} setClauses={setClauses} placeholder="Enter a filter..." />;
 }
 
 interface OmnibarUserProps {
@@ -171,35 +175,23 @@ interface OmnibarUserProps {
 }
 
 export function OmnibarUsers({ clauses, setClauses, users }: OmnibarUserProps) {
-  let dropdownOptions: OmnibarOptionMap = {};
+  let registry = emptyRegistry();
   // suggest every group present across the listed users (admins browse users in all groups)
-  dropdownOptions = addGroupOptions(dropdownOptions, uniqueSort(users.flatMap((user) => user.groups)));
-  dropdownOptions = addStringOption(dropdownOptions, 'username', uniqueSort(users.map((user) => user.username)), [
-    ClauseCondition.Includes,
-    ClauseCondition.Is,
-  ]);
-  dropdownOptions = addStringOption(
-    dropdownOptions,
-    'email',
-    uniqueSort(users.map((user) => user.email)),
-    [ClauseCondition.Includes, ClauseCondition.Is],
-    {
-      creatable: true,
-    },
-  );
-  // role values are the fixed set of Thorium roles (Admin/Analyst/Developer/User)
-  dropdownOptions = addStringOption(dropdownOptions, 'role', Object.values(RoleKey), [ClauseCondition.Is, ClauseCondition.IsOneOf], {
+  registry = addGroupOptions(registry, uniqueSort(users.flatMap((user) => user.groups)));
+  registry = addStringOption(registry, 'username', uniqueSort(users.map((user) => user.username)), CLIENT_SIDE_TEXT);
+  registry = addStringOption(registry, 'email', uniqueSort(users.map((user) => user.email)), CLIENT_SIDE_TEXT);
+  // role values are the fixed set of Thorium roles (Admin/Analyst/Developer/User), so a value outside
+  // the list is a typo rather than a filter that might match
+  registry = addStringOption(registry, 'role', Object.values(RoleKey), CLIENT_SIDE_LIST, {
     category: 'role',
+    orCapable: true,
+    creatable: false,
   });
   // boolean fields: pick true or false
-  dropdownOptions = addStringOption(dropdownOptions, 'verified', ['true', 'false'], [ClauseCondition.Is]);
-  dropdownOptions = addStringOption(dropdownOptions, 'local', ['true', 'false'], [ClauseCondition.Is]);
+  registry = addStringOption(registry, 'verified', ['true', 'false'], [ClauseCondition.Is], { creatable: false });
+  registry = addStringOption(registry, 'local', ['true', 'false'], [ClauseCondition.Is], { creatable: false });
 
-  return (
-    <OmnibarWrapperContainer>
-      <Omnibar clauses={clauses} dropdownOptions={dropdownOptions} setClauses={setClauses} placeholder="Enter a filter..." />
-    </OmnibarWrapperContainer>
-  );
+  return <Omnibar clauses={clauses} registry={registry} setClauses={setClauses} placeholder="Enter a filter..." />;
 }
 
 interface OmnibarImageProps {
@@ -212,21 +204,11 @@ export function OmnibarImages({ clauses, setClauses, images }: OmnibarImageProps
   const { userInfo } = useAuth();
   const userInfoGroups = userInfo !== null ? userInfo.groups : [];
 
-  let dropdownOptions: OmnibarOptionMap = {};
-  dropdownOptions = addGroupOptions(dropdownOptions, userInfoGroups);
-  dropdownOptions = addTextOptions(dropdownOptions);
-  dropdownOptions = addStringOption(dropdownOptions, 'creator', uniqueSort(images.map((image) => image.creator)), [
-    ClauseCondition.Includes,
-    ClauseCondition.Is,
-  ]);
-  dropdownOptions = addStringOption(dropdownOptions, 'name', uniqueSort(images.map((image) => image.name)), [
-    ClauseCondition.Includes,
-    ClauseCondition.Is,
-  ]);
+  let registry = emptyRegistry();
+  registry = addGroupOptions(registry, userInfoGroups);
+  registry = addTextOptions(registry);
+  registry = addStringOption(registry, 'creator', uniqueSort(images.map((image) => image.creator)), CLIENT_SIDE_TEXT);
+  registry = addStringOption(registry, 'name', uniqueSort(images.map((image) => image.name)), CLIENT_SIDE_TEXT);
 
-  return (
-    <OmnibarWrapperContainer>
-      <Omnibar clauses={clauses} dropdownOptions={dropdownOptions} setClauses={setClauses} placeholder="Enter a filter..." />
-    </OmnibarWrapperContainer>
-  );
+  return <Omnibar clauses={clauses} registry={registry} setClauses={setClauses} placeholder="Enter a filter..." />;
 }

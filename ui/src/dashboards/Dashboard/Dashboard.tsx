@@ -12,7 +12,6 @@ import DashboardDataProvider from './DashboardDataProvider';
 import DashboardGraphTile from './DashboardGraphTile';
 import DashboardOmnibar from './DashboardOmnibar';
 import { makeDepthClause, withDepthClause } from './depthClause';
-import PaneExpandToggle from './PaneExpandToggle';
 import { decodeSeedParams } from './seedParams';
 import StatsPanel from './StatsPanel';
 import {
@@ -25,20 +24,19 @@ import {
   PaneScroll,
   StatsRow,
   TileHeader,
-  TileHeaderActions,
   TileHeaderRow,
   ULTRA_WIDE_BREAKPOINT,
 } from './styles';
 import { resetFilterClauses, toggleTagValue } from './tagFilter';
 import { getDepthFromClauses } from '@components/associations/browsing/EntityBrowser/browserHelpers';
 import { EntityBrowserProvider } from '@components/associations/browsing/EntityBrowser/EntityBrowserContext';
-import EntitySortControls from '@components/associations/browsing/EntityBrowser/controls/EntitySortControls';
 import { MAX_DEPTH } from '@components/associations/browsing/EntityBrowser/omnibarOptions';
 import { SortMode } from '@components/associations/browsing/EntityBrowser/types';
 import { GraphDataProvider, useGraphData } from '@components/associations/data/GraphDataContext';
 import Page from '@components/pages/Page';
 import AlertBanner, { Severity } from '@components/shared/alerts/AlertBanner';
-import { Clause, ClauseIsMulti } from '@components/shared/inputs/omnibar/ClauseTypes';
+import { Clause, ClauseIsMulti, DEFAULT_HIDDEN_TAGS } from '@components/shared/inputs/omnibar/clauses/ClauseTypes';
+import { defaultOmnibarSettings } from '@components/shared/inputs/omnibar/urlState';
 import { useOmnibarUrlState } from '@components/shared/inputs/omnibar/useOmnibarUrlState';
 import { Tabs } from '@components/shared/tabs';
 import { boolCodec, setCodec, stringCodec } from '@utilities/url/codecs';
@@ -171,7 +169,12 @@ export const DashboardContent: React.FC<DashboardContentProps> = ({ seed, depthA
   const navigate = useNavigate();
   // clauses live in the URL (disjoint keys from the seed's sample/entity/repo/tag/depth) so filters are
   // shareable; the same clauses/setClauses drive the provider, the omnibar strip, and the stats-bar clicks
-  const { clauses, setClauses } = useOmnibarUrlState({ clauses: [], time: { mode: 'all' } });
+  // hidden tags are a display filter in settings rather than a clause, so the tags tile reads them from here
+  const { clauses, setClauses, settings } = useOmnibarUrlState({
+    clauses: [],
+    time: { mode: 'all' },
+    settings: { ...defaultOmnibarSettings(), hiddenTags: DEFAULT_HIDDEN_TAGS },
+  });
   // hidden/flagged are URL-backed (disjoint keys from the seed and omnibar clauses) and fed to the provider
   // as controlled state, so hiding a node / flagging survives refresh and is shareable via the dashboard link
   const [hiddenNodes, setHiddenNodes] = useUrlState(HIDDEN_CODEC, EMPTY_HIDDEN);
@@ -280,6 +283,7 @@ export const DashboardContent: React.FC<DashboardContentProps> = ({ seed, depthA
               currentDepth={currentDepth}
               onGrowLevel={onGrowLevel}
               onBarClick={onBarClick}
+              hiddenTags={settings.hiddenTags}
               isUltraWide={isUltraWide}
               activeTab={activeTab}
               setActiveTab={setActiveTab}
@@ -305,6 +309,8 @@ interface DashboardBodyProps {
   onGrowLevel: () => void;
   /// Called with the omnibar clause a clicked stats bar maps to.
   onBarClick: (clause: Clause) => void;
+  //Tag keys hidden from the tags tile
+  hiddenTags: string[];
   /// Whether the ultra-wide two-column layout is active.
   isUltraWide: boolean;
   /// The active content tab (narrow layout only).
@@ -333,6 +339,7 @@ const DashboardBody: React.FC<DashboardBodyProps> = ({
   currentDepth,
   onGrowLevel,
   onBarClick,
+  hiddenTags,
   isUltraWide,
   activeTab,
   setActiveTab,
@@ -374,7 +381,6 @@ const DashboardBody: React.FC<DashboardBodyProps> = ({
   // "collapse" and clicking either restores the split view; only in the split view do they read as "expand"
   // (each focusing its own pane). So the two buttons never disagree.
   const anyExpanded = mode === ContentMode.Expanded;
-  const toggleBrowserExpand = useCallback(() => setPanel(anyExpanded ? '' : PaneFocus.Browser), [anyExpanded, setPanel]);
   const toggleGraphExpand = useCallback(() => setPanel(anyExpanded ? '' : PaneFocus.Graph), [anyExpanded, setPanel]);
 
   // measure the two split columns so the reactions tile can tuck under the SHORTER one (greedy masonry)
@@ -430,7 +436,7 @@ const DashboardBody: React.FC<DashboardBodyProps> = ({
         />
       </ControlsRow>
       <OmnibarRow>
-        <DashboardOmnibar clauses={clauses} setClauses={setClauses} />
+        <DashboardOmnibar clauses={clauses} setClauses={setClauses} hiddenTags={hiddenTags} />
       </OmnibarRow>
       {/* the browser and graph panes always live in the same two ColWrap columns, so switching
           split ⇄ expanded ⇄ tabs never re-parents (remounts) the browser's state or the graph's WebGL

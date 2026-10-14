@@ -5,7 +5,8 @@ import { useNavigate } from 'react-router';
 // project imports
 import { getCreatePathByEntity } from '@components/entities/create/EntityCreateRoutes';
 import { OmnibarStandardTimeFilters } from '@components/shared/inputs/omnibar/Bars';
-import { DefaultClausesEntities } from '@components/shared/inputs/omnibar/ClauseTypes';
+import { DEFAULT_HIDDEN_TAGS } from '@components/shared/inputs/omnibar/clauses/ClauseTypes';
+import { defaultOmnibarSettings } from '@components/shared/inputs/omnibar/urlState';
 import { useOmnibarUrlState } from '@components/shared/inputs/omnibar/useOmnibarUrlState';
 import { OverlayTipLeft } from '@components/shared/overlay/tips';
 import Title from '@components/shared/titles/Title';
@@ -29,14 +30,20 @@ interface BrowsingFiltersProps {
 
 const BrowsingFilters: React.FC<BrowsingFiltersProps> = ({ onChange, disabled = false, title = null, kind, creatable = false }) => {
   const navigate = useNavigate();
-  // clauses + time live in the URL so filtered browse views are shareable/bookmarkable
-  const { clauses, setClauses, time, setTime } = useOmnibarUrlState({ clauses: DefaultClausesEntities(), time: { mode: 'all' } });
+  // clauses + time + settings live in the URL so filtered browse views are shareable/bookmarkable
+  const { clauses, setClauses, time, setTime, settings, setSettings } = useOmnibarUrlState({
+    clauses: [],
+    time: { mode: 'all' },
+    // hidden tags are a display filter in settings rather than a clause, but the default set is
+    // unchanged and still encodes to the same `hide`/`nohide` params
+    settings: { ...defaultOmnibarSettings(), hiddenTags: DEFAULT_HIDDEN_TAGS },
+  });
 
-  // push filters to the parent on mount and whenever the URL-backed clauses/time change (covers
-  // user edits, deep links, and back/forward navigation uniformly)
+  // push filters to the parent on mount and whenever the URL-backed clauses/time/settings change
+  // (covers user edits, deep links, and back/forward navigation uniformly)
   useEffect(() => {
-    onChange(OmniClauseAndTimeToFilter(clauses, time));
-  }, [clauses, time, onChange]);
+    onChange(OmniClauseAndTimeToFilter(clauses, time, settings));
+  }, [clauses, time, settings, onChange]);
 
   return (
     <>
@@ -69,7 +76,14 @@ const BrowsingFilters: React.FC<BrowsingFiltersProps> = ({ onChange, disabled = 
       )}
       <Row>
         <Col className="d-flex justify-content-center">
-          <OmnibarStandardTimeFilters clauses={clauses} setClauses={setClauses} time={time} setTime={setTime} />
+          <OmnibarStandardTimeFilters
+            clauses={clauses}
+            setClauses={setClauses}
+            time={time}
+            setTime={setTime}
+            settings={settings}
+            setSettings={setSettings}
+          />
         </Col>
       </Row>
     </>

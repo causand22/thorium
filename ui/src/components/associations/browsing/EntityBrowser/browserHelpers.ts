@@ -27,8 +27,8 @@ import {
   TraversalConfig,
 } from './types';
 import { flatTagsToTags } from '@components/shared/info/info';
-import { Clause } from '@components/shared/inputs/omnibar/ClauseTypes';
-import { getStringFieldListFromClauses } from '@components/shared/inputs/omnibar/utils';
+import { Clause } from '@components/shared/inputs/omnibar/clauses/ClauseTypes';
+import { getStringFieldListFromClauses } from '@components/shared/inputs/omnibar/clauses/utils';
 import { DangerTagKeys, FileInfoTagKeys, MitreTagKeys } from '@components/tags/tag_groups';
 import { filterIncludedTags } from '@components/tags/utilities';
 import { Entities } from '@models/entities';

@@ -7,15 +7,16 @@ import AlertBanner from '@components/shared/alerts/AlertBanner';
 import UserAvatar from '@components/shared/UserAvatar';
 import Page from '@components/pages/Page';
 import { OmnibarUsers } from '@components/shared/inputs/omnibar/Bars';
-import { Clause } from '@components/shared/inputs/omnibar/ClauseTypes';
+import { Clause } from '@components/shared/inputs/omnibar/clauses/ClauseTypes';
 import { defaultTimeSelection } from '@components/shared/inputs/omnibar/timepicker/utils';
+import { defaultOmnibarSettings } from '@components/shared/inputs/omnibar/urlState';
 import { useOmnibarUrlState } from '@components/shared/inputs/omnibar/useOmnibarUrlState';
 import {
   getGroupsFromClauses,
   getStringFieldFromClauses,
   getStringFieldListFromClauses,
   matchesStringClauses,
-} from '@components/shared/inputs/omnibar/utils';
+} from '@components/shared/inputs/omnibar/clauses/utils';
 import NoResultsBanner from '@components/shared/alerts/NoResultsBanner';
 import Title from '@components/shared/titles/Title';
 import { OverlayTipLeft } from '@components/shared/overlay/tips';
@@ -408,7 +409,7 @@ const UserBrowsing = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [users, setUsers] = useState<UserInfo[]>([]);
   // omnibar filters live in the URL so a filtered user list is shareable
-  const { clauses, setClauses } = useOmnibarUrlState({ clauses: [], time: defaultTimeSelection() });
+  const { clauses, setClauses } = useOmnibarUrlState({ clauses: [], time: defaultTimeSelection(), settings: defaultOmnibarSettings() });
   const { checkCookie, impersonate } = useAuth();
 
   const filteredUsers = filterUsers(users, clauses);

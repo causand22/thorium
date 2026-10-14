@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 // project imports
 import { makeDepthClause, withDepthClause } from './depthClause';
-import { ClauseCondition, type Clause } from '@components/shared/inputs/omnibar/ClauseTypes';
+import { ClauseCondition, type Clause } from '@components/shared/inputs/omnibar/clauses/ClauseTypes';
 
 /** A non-depth text clause used to assert unrelated clauses survive. */
 function textClause(value: string): Clause {

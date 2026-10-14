@@ -6,10 +6,11 @@ import { useNavigate } from 'react-router-dom';
 import ImageAccordionItem from '@components/pages/images/ImageAccordionItem';
 import Page from '@components/pages/Page';
 import { OmnibarImages } from '@components/shared/inputs/omnibar/Bars';
-import type { Clause } from '@components/shared/inputs/omnibar/ClauseTypes';
+import type { Clause } from '@components/shared/inputs/omnibar/clauses/ClauseTypes';
 import { defaultTimeSelection } from '@components/shared/inputs/omnibar/timepicker/utils';
+import { defaultOmnibarSettings } from '@components/shared/inputs/omnibar/urlState';
 import { useOmnibarUrlState } from '@components/shared/inputs/omnibar/useOmnibarUrlState';
-import { getGroupsFromClauses, getSearchTextFromClauses, matchesStringClauses } from '@components/shared/inputs/omnibar/utils';
+import { getGroupsFromClauses, getTextFromClauses, matchesStringClauses } from '@components/shared/inputs/omnibar/clauses/utils';
 import NoResultsBanner from '@components/shared/alerts/NoResultsBanner';
 import Title from '@components/shared/titles/Title';
 import LoadingSpinner from '@components/shared/fallback/LoadingSpinner';
@@ -34,13 +35,14 @@ import { groupListToRecord } from '@utilities/groups';
 /** Filter images client-side by the omnibar clauses (group, creator, name, free text). */
 const filterImages = (images: Image[], clauses: Clause[]): Image[] => {
   const groups = getGroupsFromClauses(clauses);
-  const text = getSearchTextFromClauses(clauses);
+  const texts = getTextFromClauses(clauses);
 
   return images.filter((image) => {
     const groupFilter = groups.length > 0 ? groups.includes(image.group) : true;
     const creatorFilter = matchesStringClauses(clauses, 'creator', image.creator);
     const nameFilter = matchesStringClauses(clauses, 'name', image.name);
-    const textFilter = image.name.includes(text) || (image.description?.includes(text) ?? false);
+    // every text chip must match, mirroring the AND the search backend applies
+    const textFilter = texts.every((text) => image.name.includes(text) || (image.description?.includes(text) ?? false));
     return groupFilter && creatorFilter && nameFilter && textFilter;
   });
 };
@@ -70,7 +72,8 @@ const CreateImageButton: FC<CreateImageButtonProps> = ({ userInfo }) => {
 };
 
 const ImageBrowsing: FC = () => {
-  const { clauses, setClauses } = useOmnibarUrlState({ clauses: [], time: defaultTimeSelection() });
+  // expanded accordion rows + omnibar filters live in the URL so the view is shareable
+  const { clauses, setClauses } = useOmnibarUrlState({ clauses: [], time: defaultTimeSelection(), settings: defaultOmnibarSettings() });
   const { userInfo } = useAuth();
   const [activeKeys, setActiveKeys] = useState<string[]>([]);
 

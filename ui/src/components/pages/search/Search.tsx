@@ -8,15 +8,11 @@ import styled from 'styled-components';
 
 // project imports
 import { OmnibarMainSearch } from '../../shared/inputs/omnibar/Bars';
-import { Clause } from '../../shared/inputs/omnibar/ClauseTypes';
+import { Clause } from '../../shared/inputs/omnibar/clauses/ClauseTypes';
 import { TimeSelection, TimeSelectionToStrings, defaultTimeSelection } from '../../shared/inputs/omnibar/timepicker/utils';
+import { defaultOmnibarSettings } from '../../shared/inputs/omnibar/urlState';
 import { useOmnibarUrlState } from '../../shared/inputs/omnibar/useOmnibarUrlState';
-import {
-  getGroupsFromClauses,
-  getIndexesFromClauses,
-  getLimitFromClauses,
-  getSearchTextFromClauses,
-} from '../../shared/inputs/omnibar/utils';
+import { getGroupsFromClauses, getIndexesFromClauses, getSearchTextFromClauses } from '../../shared/inputs/omnibar/clauses/utils';
 import EntityList from '@entities/browsing/EntityList';
 import { search } from '@thorpi/search';
 import { OmniClauseAndTimeToFilter } from '@utilities/search';
@@ -147,13 +143,13 @@ const getSearchResults = async (
   query: string,
   clauses: Clause[],
   omniTime: TimeSelection,
+  limit: number,
   setSearchError: (error: string) => void,
   cursor: string | null,
 ): Promise<{ entitiesList: ElasticDoc[]; entitiesCursor: string | null }> => {
   if (query !== '') {
     const groups = getGroupsFromClauses(clauses);
     const indexes = getIndexesFromClauses(clauses);
-    const limit = getLimitFromClauses(clauses, 25);
     const [end, start] = TimeSelectionToStrings(omniTime);
 
     // get files list from API
@@ -186,9 +182,12 @@ const Search = () => {
     setClauses: setOmnibarClauses,
     time: omniTime,
     setTime: setOmniTime,
+    settings: omnibarSettings,
+    setSettings: setOmnibarSettings,
   } = useOmnibarUrlState({
     clauses: [],
     time: defaultTimeSelection(),
+    settings: defaultOmnibarSettings(),
   });
   const [searching, setSearching] = useState<boolean>(true);
   const [filters, setFilters] = useState<SearchFilters>({ query: '' });
@@ -204,10 +203,10 @@ const Search = () => {
       const query = getSearchTextFromClauses(omnibarClauses);
       setDebouncedQuery(query);
       setSearchError('');
-      setFilters({ ...OmniClauseAndTimeToFilter(omnibarClauses, omniTime), query });
+      setFilters({ ...OmniClauseAndTimeToFilter(omnibarClauses, omniTime, omnibarSettings), query });
     }, 500);
     return () => clearTimeout(handleSetQuery);
-  }, [omnibarClauses, omniTime]);
+  }, [omnibarClauses, omniTime, omnibarSettings]);
 
   useEffect(() => {
     setSearching(false);
@@ -217,7 +216,14 @@ const Search = () => {
     <Stack>
       <div className="d-flex flex-row justify-content-center">
         <SearchBarContainer>
-          <OmnibarMainSearch clauses={omnibarClauses} setClauses={setOmnibarClauses} time={omniTime} setTime={setOmniTime} />
+          <OmnibarMainSearch
+            clauses={omnibarClauses}
+            setClauses={setOmnibarClauses}
+            time={omniTime}
+            setTime={setOmniTime}
+            settings={omnibarSettings}
+            setSettings={setOmnibarSettings}
+          />
         </SearchBarContainer>
       </div>
       {omnibarClauses.length > 0 && searchError === '' && (
@@ -227,7 +233,9 @@ const Search = () => {
             entityHeaders={<SearchResultsHeaders />}
             displayEntity={(result, idx) => <SearchResultItem result={result as ElasticDoc} idx={idx} />}
             filters={filters}
-            fetchEntities={(_, cursor) => getSearchResults(debouncedQuery, omnibarClauses, omniTime, setSearchError, cursor)}
+            fetchEntities={(_, cursor) =>
+              getSearchResults(debouncedQuery, omnibarClauses, omniTime, omnibarSettings.limit, setSearchError, cursor)
+            }
             setLoading={setSearching}
             loading={searching}
           />

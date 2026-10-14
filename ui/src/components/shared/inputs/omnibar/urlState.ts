@@ -1,35 +1,49 @@
 /**
- * Serialize omnibar state (clauses + time selection) to/from the URL query string.
+ * Serialize omnibar state (clauses + time selection + settings) to/from the URL query string.
  *
  * Well-known fields use readable, legacy-compatible param keys (`query`, `groups`, `indexes`,
  * `tags[KEY]`, `limit`, `hide`, `start`/`end`/`last`) so existing link producers (TagBadge,
- * buildCollectionsBrowsingUrl) and old bookmarks keep working. Any other clause field rides a
- * generic, lossless fallback (`c=`), so the codec works on every browse page regardless of its
- * field vocabulary (creator, name, role, username, …).
+ * buildCollectionsBrowsingUrl) and old bookmarks keep working. Those keys can't carry a condition, so
+ * any clause with a non-default one (`!=`, `~`) rides the generic, lossless fallback (`c=`) instead.
  *
- * Clauses and time are exposed as two independent {@link ParamCodec}s so they can be bound to the
- * URL separately (they own disjoint keys and never clobber one another). Built on the generic
+ * Clauses, time and settings are exposed as three independent {@link ParamCodec}s so they can be bound
+ * to the URL separately (they own disjoint keys and never clobber one another). Built on the generic
  * codec seam (`@utilities/url`); knows nothing about React.
  */
 
 // project imports
-import { Clause, ClauseCondition, ClauseIsMulti, CondIsMulti, NewTextClause, parseClauseCondition } from './ClauseTypes';
+import { Clause, ClauseCondition, ClauseIsMulti, CondIsMulti, NewTextClause, parseClauseCondition } from './clauses/ClauseTypes';
 import { RelativeUnit, TimeSelection } from './timepicker/utils';
 import type { ParamCodec } from '@utilities/url/codecs';
 
 // spec: ./SPEC.md
 
-export type OmniState = { clauses: Clause[]; time: TimeSelection };
+/**
+ * Request-shaping settings independent of any single clause.
+ *
+ * `hiddenTags` lives here rather than in a clause because it has no `key <operator> value` form: it is
+ * a display filter over which tag keys are rendered, not a query filter (SPEC §10).
+ */
+export type OmnibarSettings = { tagsCaseInsensitive: boolean; limit: number; hiddenTags: string[] };
 
-// Param keys owned by the clause codec (excluding the dynamic `tags[KEY]` keys). `nohide` is the
-// sentinel marking "hidden tags explicitly cleared" so it can be distinguished from "unset".
+export function defaultOmnibarSettings(): OmnibarSettings {
+  return { tagsCaseInsensitive: true, limit: 25, hiddenTags: [] };
+}
+
+export type OmniState = { clauses: Clause[]; time: TimeSelection; settings: OmnibarSettings };
+
+// Param keys owned by the clause codec (excluding the dynamic `tags[KEY]` keys).
 // These are disjoint from the dashboard's own keys — its seed keys (`sample`/`entity`/`repo`/`tag`/`depth`)
 // and its `hidden`/`flagged` state keys — so a dashboard URL can merge omnibar and dashboard params without
-// collision. Note the near-collision: `hide` here holds hidden TAG KEYS (a display filter), whereas the
-// dashboard's `hidden` holds hidden NODE IDS; they are distinct keys and never overlap.
-const CLAUSE_STATIC_KEYS = ['query', 'groups', 'indexes', 'limit', 'hide', 'nohide', 'c'];
+// collision.
+const CLAUSE_STATIC_KEYS = ['query', 'groups', 'indexes', 'c'];
 // Param keys owned by the time codec.
 const TIME_KEYS = ['last', 'round', 'start', 'end'];
+// Param keys owned by the settings codec. `limit`, `hide` and `nohide` keep their existing,
+// legacy-compatible names even though hidden tags are no longer clauses. `nohide` is the sentinel
+// marking "hidden tags explicitly cleared" so it can be distinguished from "unset". Note the
+// near-collision: `hide` holds hidden TAG KEYS, whereas the dashboard's `hidden` holds hidden NODE IDS.
+const SETTINGS_KEYS = ['limit', 'caseInsensitive', 'hide', 'nohide'];
 
 const UNIT_TO_ABBR: Record<RelativeUnit, string> = {
   minute: 'min',
@@ -61,7 +75,12 @@ function multiCondition(values: string[]): ClauseCondition {
   return values.length > 1 ? ClauseCondition.IsOneOf : ClauseCondition.Is;
 }
 
-// ---- generic fallback (any field without a readable key) ----------------------------------------
+/** Whether the readable param keys can represent this clause without losing its condition. */
+function hasDefaultCondition(clause: Clause): boolean {
+  return clause.condition === ClauseCondition.Is || clause.condition === ClauseCondition.IsOneOf;
+}
+
+// ---- generic fallback (any clause without a readable key) ---------------------------------------
 
 function encodeGenericClause(clause: Clause): string {
   const valuesPart = clauseValues(clause).map(encodeURIComponent).join(',');
@@ -84,31 +103,25 @@ function decodeGenericClause(raw: string): Clause | undefined {
 export function clausesToParams(clauses: Clause[], params: URLSearchParams): void {
   clauses.forEach((clause) => {
     const values = clauseValues(clause);
-    if (clause.field === 'hidden tags') {
-      values.forEach((value) => params.append('hide', value));
+    // `!=` and `~` have no readable encoding, so they fall through to the generic form
+    if (!hasDefaultCondition(clause)) {
+      params.append('c', encodeGenericClause(clause));
     } else if (clause.field === 'text') {
       values.forEach((value) => params.append('query', value));
-    } else if (clause.field === 'group') {
+    } else if (clause.field === 'group' && clause.category === 'group') {
       values.forEach((value) => params.append('groups', value));
     } else if (clause.field === 'index') {
       values.forEach((value) => params.append('indexes', value));
-    } else if (clause.field === 'limit') {
-      params.set('limit', values[0] ?? '');
-    } else if (clause.category === 'tag') {
-      values.forEach((value) => params.append(`tags[${clause.field}]`, value));
+    } else if (clause.category === 'tag' && clause.condition === ClauseCondition.Is) {
+      params.append(`tags[${clause.field}]`, values[0]);
     } else {
       params.append('c', encodeGenericClause(clause));
     }
   });
 }
 
-/**
- * Decode omnibar clauses from `params`. When the URL is silent about hidden tags, the default
- * hidden-tags clause(s) from `defaultClauses` are preserved so browse results stay filtered — unless
- * the `nohide` sentinel is present, which marks the hidden-tags filter as explicitly cleared (so the
- * defaults are not re-injected).
- */
-export function paramsToClauses(params: URLSearchParams, defaultClauses: Clause[] = []): Clause[] {
+/** Decode omnibar clauses from `params`. */
+export function paramsToClauses(params: URLSearchParams): Clause[] {
   const clauses: Clause[] = [];
 
   params.getAll('query').forEach((value) => clauses.push(NewTextClause(value)));
@@ -123,22 +136,13 @@ export function paramsToClauses(params: URLSearchParams, defaultClauses: Clause[
     clauses.push(makeClause('index', 'index', multiCondition(indexes), indexes));
   }
 
-  // tags[KEY]=value -> one `Is` clause per value
+  // tags[KEY]=value -> one `Is` clause per value. Several values for one key stay separate clauses
+  // because that is what the backend computes: they intersect rather than union.
   for (const [key, value] of params.entries()) {
     const match = /^tags\[(.+)\]$/.exec(key);
     if (match) {
       clauses.push(makeClause('tag', match[1], ClauseCondition.Is, [value]));
     }
-  }
-
-  const limit = params.get('limit');
-  if (limit) {
-    clauses.push(makeClause('limit', 'limit', ClauseCondition.Is, [limit]));
-  }
-
-  const hide = params.getAll('hide');
-  if (hide.length > 0) {
-    clauses.push(makeClause('hidden tags', 'hidden tags', ClauseCondition.Are, hide));
   }
 
   params.getAll('c').forEach((raw) => {
@@ -147,13 +151,6 @@ export function paramsToClauses(params: URLSearchParams, defaultClauses: Clause[
       clauses.push(clause);
     }
   });
-
-  // preserve default hidden-tags filtering when the URL doesn't specify it — but not when the user
-  // has explicitly cleared it (`nohide` sentinel)
-  const hiddenCleared = params.get('nohide') === '1';
-  if (!hiddenCleared && !clauses.some((clause) => clause.field === 'hidden tags')) {
-    defaultClauses.filter((clause) => clause.field === 'hidden tags').forEach((clause) => clauses.push(clause));
-  }
 
   return clauses;
 }
@@ -201,6 +198,53 @@ export function paramsToTime(params: URLSearchParams, defaultTime: TimeSelection
   return defaultTime;
 }
 
+// ---- settings <-> params ------------------------------------------------------------------------
+
+function sameTags(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((value, idx) => value === b[idx]);
+}
+
+/** Encode settings into `params` (mutates in place). Values equal to `defaultSettings` are omitted. */
+export function settingsToParams(settings: OmnibarSettings, params: URLSearchParams, defaultSettings: OmnibarSettings): void {
+  if (settings.limit !== defaultSettings.limit) {
+    params.set('limit', String(settings.limit));
+  }
+  if (settings.tagsCaseInsensitive !== defaultSettings.tagsCaseInsensitive) {
+    params.set('caseInsensitive', settings.tagsCaseInsensitive ? '1' : '0');
+  }
+  if (!sameTags(settings.hiddenTags, defaultSettings.hiddenTags)) {
+    // an empty list is indistinguishable from "unset" in the URL, so mark it with the sentinel
+    if (settings.hiddenTags.length === 0) {
+      params.set('nohide', '1');
+    } else {
+      settings.hiddenTags.forEach((value) => params.append('hide', value));
+    }
+  }
+}
+
+/** Decode settings from `params`, falling back to `defaultSettings` for any absent/unparseable field. */
+export function paramsToSettings(params: URLSearchParams, defaultSettings: OmnibarSettings): OmnibarSettings {
+  const limitParam = params.get('limit');
+  const limit = limitParam !== null && Number.isInteger(Number(limitParam)) ? Number.parseInt(limitParam, 10) : defaultSettings.limit;
+
+  const caseParam = params.get('caseInsensitive');
+  const tagsCaseInsensitive = caseParam === null ? defaultSettings.tagsCaseInsensitive : caseParam === '1';
+
+  // preserve default hidden-tag filtering when the URL is silent — but not when the user explicitly
+  // cleared it (`nohide` sentinel)
+  const hide = params.getAll('hide');
+  let hiddenTags: string[];
+  if (hide.length > 0) {
+    hiddenTags = hide;
+  } else if (params.get('nohide') === '1') {
+    hiddenTags = [];
+  } else {
+    hiddenTags = defaultSettings.hiddenTags;
+  }
+
+  return { limit, tagsCaseInsensitive, hiddenTags };
+}
+
 // ---- combined helpers (for tests and legacy link producers) ------------------------------------
 
 /** Encode both clauses and time into a fresh-or-existing `params`. */
@@ -214,27 +258,23 @@ export function clausesAndTimeToParams(
   return params;
 }
 
-/** Decode both clauses and time, merging in `defaults` where the URL is silent. */
+/** Decode clauses, time, and settings, merging in `defaults` where the URL is silent. */
 export function paramsToClausesAndTime(params: URLSearchParams, defaults: OmniState): OmniState {
-  return { clauses: paramsToClauses(params, defaults.clauses), time: paramsToTime(params, defaults.time) };
+  return {
+    clauses: paramsToClauses(params),
+    time: paramsToTime(params, defaults.time),
+    settings: paramsToSettings(params, defaults.settings),
+  };
 }
 
 // ---- codecs ------------------------------------------------------------------------------------
 
-/** A {@link ParamCodec} binding omnibar clauses to the URL, seeded from `defaultClauses`. */
-export function clausesCodec(defaultClauses: Clause[]): ParamCodec<Clause[]> {
-  const defaultsHaveHidden = defaultClauses.some((clause) => clause.field === 'hidden tags');
+/** A {@link ParamCodec} binding omnibar clauses to the URL. */
+export function clausesCodec(): ParamCodec<Clause[]> {
   return {
     keys: (params) => [...CLAUSE_STATIC_KEYS, ...Array.from(params.keys()).filter((key) => key.startsWith('tags['))],
-    encode: (clauses, params) => {
-      clausesToParams(clauses, params);
-      // only relevant for pages whose defaults include hidden tags: if the user cleared them, record
-      // the `nohide` sentinel so decode doesn't silently restore the defaults
-      if (defaultsHaveHidden && !clauses.some((clause) => clause.field === 'hidden tags')) {
-        params.set('nohide', '1');
-      }
-    },
-    decode: (params) => paramsToClauses(params, defaultClauses),
+    encode: (clauses, params) => clausesToParams(clauses, params),
+    decode: (params) => paramsToClauses(params),
   };
 }
 
@@ -244,5 +284,14 @@ export function timeCodec(defaultTime: TimeSelection): ParamCodec<TimeSelection>
     keys: () => TIME_KEYS,
     encode: (time, params) => timeToParams(time, params),
     decode: (params) => paramsToTime(params, defaultTime),
+  };
+}
+
+/** A {@link ParamCodec} binding omnibar settings to the URL, seeded from `defaultSettings`. */
+export function settingsCodec(defaultSettings: OmnibarSettings): ParamCodec<OmnibarSettings> {
+  return {
+    keys: () => SETTINGS_KEYS,
+    encode: (settings, params) => settingsToParams(settings, params, defaultSettings),
+    decode: (params) => paramsToSettings(params, defaultSettings),
   };
 }
