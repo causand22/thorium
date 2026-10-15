@@ -83,6 +83,8 @@ const FileDetails = () => {
     queryKey: queryKeys.files.details(sha256!),
     queryFn: () => getFileDetails(sha256!),
     enabled: !!sha256,
+    // a missing/invalid file won't appear on retry, so surface the error right away
+    retry: false,
   });
 
   const { data: groupDetails = {} } = useQuery({
@@ -170,6 +172,15 @@ const FileDetails = () => {
     handleTabChange(key);
     tabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
+
+  // file could not be loaded (e.g. not found): show only the error instead of an empty details page
+  if (!loading && getFileError) {
+    return (
+      <Page id="file-info" className="full-min-width" title={`File · ${sha256}`}>
+        <AlertBanner>{getFileError}</AlertBanner>
+      </Page>
+    );
+  }
 
   return (
     <Page id="file-info" className="full-min-width" title={`File · ${sha256}`}>

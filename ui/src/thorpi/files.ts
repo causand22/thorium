@@ -1,4 +1,4 @@
-import client, { parseRequestError } from './client';
+import client, { parseRequestError, parseRequestErrorString } from './client';
 
 // project imports
 import { RequestTags, TagCounts } from '@models/tags';
@@ -190,9 +190,13 @@ export async function getFileDetailsLegacy(sha256: string, errorHandler: (error:
  */
 export async function getFileDetails(sha256: string): Promise<Sample> {
   const url = '/files/sample/' + sha256;
-  const res = await client.get<Sample>(url);
-  if (res?.status === 200 && res.data) {
-    return res.data;
+  try {
+    const res = await client.get<Sample>(url);
+    if (res?.status === 200 && res.data) {
+      return res.data;
+    }
+  } catch (error: unknown) {
+    throw new Error(parseRequestErrorString(error, 'Get File Details'));
   }
   throw new Error('Get File Details failed');
 }
