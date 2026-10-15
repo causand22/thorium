@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import type { Tags } from '@models/tags';
 
 // project imports
 import {
@@ -9,6 +10,7 @@ import {
   filterExcludedTags,
   getTagColorClass,
   getTagBadgeText,
+  visibleFileTagGroups,
 } from './utilities';
 import { paramsToClauses } from '@components/shared/inputs/omnibar/urlState';
 import { Entities } from '@models/entities';
@@ -239,5 +241,37 @@ describe('countTagValues', () => {
   it('tolerates a key with a null/undefined value map', () => {
     const tags = { Family: { emotet: ['emotet'] }, Broken: undefined } as unknown as Tags;
     expect(countTagValues(tags)).toBe(1);
+  });
+});
+
+describe('visibleFileTagGroups', () => {
+  const tags = {
+    FileType: { PE: {} },
+    ClamAV: { Win: {} },
+    'ATT&CK': { T1059: {} },
+    MBC: { B0001: {} },
+    Results: { Tool: {} },
+    Parent: { abc: {} },
+    Custom: { x: {} },
+  } as unknown as Tags;
+  const keys = (g: Tags) => Object.keys(g).sort();
+
+  it('shows every group when nothing is hidden', () => {
+    const g = visibleFileTagGroups(tags, []);
+    expect(keys(g.fileInfo)).toEqual(['FileType']);
+    expect(keys(g.attack)).toEqual(['ATT&CK']);
+    expect(keys(g.mbc)).toEqual(['MBC']);
+    expect(keys(g.results)).toEqual(['Results']);
+    expect(keys(g.general)).toEqual(['Custom', 'Parent']);
+  });
+
+  it('can hide a key from any group, case-insensitively', () => {
+    const g = visibleFileTagGroups(tags, ['filetype', 'ClamAV', 'ATT&CK', 'MBC', 'Results', 'Custom']);
+    expect(keys(g.fileInfo)).toEqual([]);
+    expect(keys(g.danger)).toEqual([]);
+    expect(keys(g.attack)).toEqual([]);
+    expect(keys(g.mbc)).toEqual([]);
+    expect(keys(g.results)).toEqual([]);
+    expect(keys(g.general)).toEqual(['Parent']);
   });
 });

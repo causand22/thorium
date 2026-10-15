@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
 // project imports
-import { toListParams } from './params';
+import { listFetchKey, toListParams } from './params';
 
 describe('toListParams', () => {
   it('drops hideTags, which no API route accepts', () => {
@@ -22,5 +22,21 @@ describe('toListParams', () => {
     const filters = { limit: 25, hideTags: ['Results'] };
     toListParams(filters, 'abc');
     expect(filters).toEqual({ limit: 25, hideTags: ['Results'] });
+  });
+});
+
+describe('listFetchKey', () => {
+  it('ignores hideTags so changing hidden tags does not change the key', () => {
+    expect(listFetchKey({ limit: 25, hideTags: ['Results'] })).toBe(listFetchKey({ limit: 25, hideTags: [] }));
+    expect(listFetchKey({ limit: 25, hideTags: ['Results'] })).toBe(listFetchKey({ limit: 25 }));
+  });
+
+  it('changes when a fetch-relevant filter changes', () => {
+    expect(listFetchKey({ limit: 25 })).not.toBe(listFetchKey({ limit: 50 }));
+    expect(listFetchKey({ limit: 25 })).not.toBe(listFetchKey({ limit: 25, tags_case_insensitive: true }));
+  });
+
+  it('is stable across distinct objects with the same contents', () => {
+    expect(listFetchKey({ limit: 25, groups: ['a'] })).toBe(listFetchKey({ limit: 25, groups: ['a'] }));
   });
 });

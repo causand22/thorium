@@ -20,6 +20,7 @@ import Tabs from '@components/shared/tabs/Tabs';
 import { TabItem } from '@components/shared/tabs/types';
 import TagSelect from '@components/shared/inputs/tags/TagSelect/TagSelect';
 import { listFiles } from '@thorpi/files';
+import { listFetchKey } from '@thorpi/params';
 import { Entities } from '@models/entities/entities';
 import { Filters } from '@models/search';
 import { Sample } from '@models/files';
@@ -173,6 +174,10 @@ const FileUploadsFirst: React.FC<{
     [filters, username],
   );
 
+  // keyed on the fetch-relevant filters so display-only changes (hidden tags) don't refetch either tab
+  const fetchKey = listFetchKey(filters);
+  const yoursFetchKey = listFetchKey(yoursFilters);
+
   useEffect(() => {
     // skip until the omnibar has pushed real filters (mirrors EntityList's mount guard)
     if (filters == null || Object.keys(filters).length === 0) {
@@ -220,7 +225,7 @@ const FileUploadsFirst: React.FC<{
     return () => {
       cancelled = true;
     };
-  }, [filters, yoursFilters, username]);
+  }, [fetchKey, yoursFetchKey, username]);
 
   // the active tab's accumulated files, page index, cursor, and filter — so the pager logic is tab-agnostic
   const isYours = active === SubmissionsTab.Yours;

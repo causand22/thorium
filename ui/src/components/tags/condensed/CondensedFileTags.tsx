@@ -3,8 +3,7 @@ import styled from 'styled-components';
 
 // project imports
 import TagBadge from '../TagBadge';
-import { DangerTagKeys, MitreTagKeys, FormattedFileInfoTagKeys } from '../tag_groups';
-import { filterIncludedTags, filterExcludedTags } from '../utilities';
+import { visibleFileTagGroups } from '../utilities';
 import { Tags } from '@models/tags';
 import { Entities } from '@models/entities';
 
@@ -22,13 +21,14 @@ interface CondensedFileTagProps {
 }
 
 const CondensedFileTags: React.FC<CondensedFileTagProps> = ({ tags, excludeKeys }) => {
-  const generalExcludeTags = [...FormattedFileInfoTagKeys, ...excludeKeys, ...MitreTagKeys, ...DangerTagKeys, 'Results'];
-  const dangerTags = filterIncludedTags(tags, DangerTagKeys);
-  const generalTags = filterExcludedTags(tags, generalExcludeTags);
-  const fileInfoTags = filterIncludedTags(tags, FormattedFileInfoTagKeys);
-  const attackTags = filterIncludedTags(tags, ['ATT&CK']);
-  const mbcTags = filterIncludedTags(tags, ['MBC']);
-  const resultsTags = filterExcludedTags(filterIncludedTags(tags, ['Results']), excludeKeys);
+  const {
+    danger: dangerTags,
+    general: generalTags,
+    fileInfo: fileInfoTags,
+    attack: attackTags,
+    mbc: mbcTags,
+    results: resultsTags,
+  } = visibleFileTagGroups(tags, excludeKeys);
   // total number of displayed tags (not including those filtered out)
   const tagCount =
     Object.keys(dangerTags).length +

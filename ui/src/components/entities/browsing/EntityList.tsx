@@ -7,6 +7,7 @@ import { LoadingSpinner } from '../../shared/fallback/LoadingSpinner';
 import { Filters, SearchFilters } from '@models/search';
 import AlertBanner from '@components/shared/alerts/AlertBanner';
 import NoResultsBanner from '@components/shared/alerts/NoResultsBanner';
+import { listFetchKey } from '@thorpi/params';
 
 // spec: ./EntityBrowsing.spec.md
 
@@ -81,6 +82,10 @@ const EntityList = <T,>({ type, displayEntity, entityHeaders, filters, fetchEnti
     isMountingRef.current = true;
   }, []);
 
+  // keyed on the fetch-relevant filters rather than the object, so display-only changes (hidden tags) re-render
+  // the rows without refetching
+  const fetchKey = listFetchKey(filters);
+
   useEffect(() => {
     if (isMountingRef.current) {
       // Skip the initial empty-filter render; fetch only once BrowsingFilters/omnibar
@@ -92,7 +97,7 @@ const EntityList = <T,>({ type, displayEntity, entityHeaders, filters, fetchEnti
     } else {
       isMountingRef.current = true;
     }
-  }, [filters]);
+  }, [fetchKey]);
 
   const updatePage = (page: number) => {
     if (page === maxPage && !loading) {

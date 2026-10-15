@@ -2,7 +2,7 @@
 import { getBrowsingPathByEntity } from '@components/entities/browsing/EntityBrowsingRoutes';
 import { Entities } from '@models/entities';
 import { Tags, TagUpperKeyEnum, TagValueEnum } from '@models/tags';
-import { DangerTagKeys, FormattedFileInfoTagKeys } from './tag_groups';
+import { DangerTagKeys, FormattedFileInfoTagKeys, MitreTagKeys } from './tag_groups';
 
 // spec: ./tags.spec.md
 
@@ -72,6 +72,34 @@ export function bucketTags(tags: Tags): TagBuckets {
     mbc: filterIncludedTags(tags, ['MBC']),
     fileInfo: filterIncludedTags(tags, FormattedFileInfoTagKeys),
     general: filterExcludedTags(tags, excludeGeneral),
+  };
+}
+
+/** The tag groups a condensed file row renders, after hidden keys are removed. */
+export interface FileTagGroups extends TagBuckets {
+  results: Tags;
+}
+
+/**
+ * Partition a file's tags into the groups a condensed file row renders, dropping `hiddenKeys` from every
+ * group (danger, ATT&CK, MBC, file-info, results and general alike) so any tag key can be hidden.
+ *
+ * @param tags - The file's nested tags.
+ * @param hiddenKeys - Tag keys to hide, matched case-insensitively.
+ * @returns The visible tags per group.
+ */
+export function visibleFileTagGroups(tags: Tags, hiddenKeys: string[]): FileTagGroups {
+  // unlike bucketTags, the general group only drops provenance keys (Parent/submitter) when they are hidden,
+  // so un-hiding them in settings shows them
+  const visible = filterExcludedTags(tags, hiddenKeys);
+  const excludeGeneral = [...FormattedFileInfoTagKeys, ...MitreTagKeys, ...DangerTagKeys, 'Results'];
+  return {
+    danger: filterIncludedTags(visible, DangerTagKeys),
+    attack: filterIncludedTags(visible, ['ATT&CK']),
+    mbc: filterIncludedTags(visible, ['MBC']),
+    fileInfo: filterIncludedTags(visible, FormattedFileInfoTagKeys),
+    general: filterExcludedTags(visible, excludeGeneral),
+    results: filterIncludedTags(visible, ['Results']),
   };
 }
 
