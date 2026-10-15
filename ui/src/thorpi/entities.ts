@@ -1,4 +1,5 @@
 import { Filters } from '@models/search';
+import { toListParams } from './params';
 import { EntityTypes } from '@models/entities/entities';
 import client, { parseRequestError } from './client';
 
@@ -154,11 +155,8 @@ export const listEntities = async (
   if (details) {
     url += '/details/';
   }
-  if (cursor) {
-    data.cursor = cursor;
-  }
   return client
-    .get<ApiCursor<EntityTypes>>(url, { params: data })
+    .get<ApiCursor<EntityTypes>>(url, { params: toListParams(data, cursor) })
     .then((res) => {
       if (res?.status && res.status == 200 && res.data) {
         const cursor = res.data.cursor ?? null;

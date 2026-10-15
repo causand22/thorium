@@ -31,7 +31,19 @@ const EntityList = <T,>({ type, displayEntity, entityHeaders, filters, fetchEnti
   const [page, setPage] = useState(0);
   const [maxPage, setMaxPage] = useState(1);
 
+  // Identifies the latest request. A fetch that is no longer the latest by the time it resolves (the
+  // filters changed, or the list unmounted) is dropped, so a slow old response can't overwrite a newer one.
+  const latestRequest = useRef(0);
+
+  useEffect(
+    () => () => {
+      latestRequest.current += 1;
+    },
+    [],
+  );
+
   const getEntityPage = async (reset: boolean) => {
+    const requestId = ++latestRequest.current;
     setLoading(true);
 
     let requestCursor = cursor;
@@ -43,6 +55,10 @@ const EntityList = <T,>({ type, displayEntity, entityHeaders, filters, fetchEnti
     setListError('');
 
     const { entitiesList, entitiesCursor } = await fetchEntities(filters, requestCursor, setListError);
+
+    if (requestId !== latestRequest.current) {
+      return;
+    }
 
     setCursor(entitiesCursor);
     setLoading(false);
@@ -68,8 +84,9 @@ const EntityList = <T,>({ type, displayEntity, entityHeaders, filters, fetchEnti
   useEffect(() => {
     if (isMountingRef.current) {
       // Skip the initial empty-filter render; fetch only once BrowsingFilters/omnibar
-      // pushes real filters, so the list loads on first paint without a double-fetch.
-      if (filters != null && Object.keys(filters).length > 0 && !loading) {
+      // pushes real filters, so the list loads on first paint without a double-fetch. Not gated on
+      // `loading`: a filter change while a fetch is in flight supersedes it rather than being dropped.
+      if (filters != null && Object.keys(filters).length > 0) {
         void getEntityPage(true);
       }
     } else {

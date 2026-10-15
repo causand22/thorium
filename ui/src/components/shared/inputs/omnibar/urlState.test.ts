@@ -7,6 +7,7 @@ import {
   clausesAndTimeToParams,
   clausesCodec,
   defaultOmnibarSettings,
+  MAX_LIMIT,
   paramsToClauses,
   paramsToClausesAndTime,
   paramsToSettings,
@@ -251,6 +252,14 @@ describe('settings url round-trips', () => {
   it.each(['', '0', '-5', '1e3', '2.5', ' 5', '5x'])('falls back to the default for limit=%j', (limit) => {
     const defaults = defaultOmnibarSettings();
     expect(paramsToSettings(new URLSearchParams({ limit }), defaults).limit).toBe(defaults.limit);
+  });
+
+  it('clamps an oversized limit to the maximum', () => {
+    expect(paramsToSettings(new URLSearchParams('limit=100000'), defaultOmnibarSettings()).limit).toBe(MAX_LIMIT);
+  });
+
+  it('accepts a limit at the maximum', () => {
+    expect(paramsToSettings(new URLSearchParams(`limit=${MAX_LIMIT}`), defaultOmnibarSettings()).limit).toBe(MAX_LIMIT);
   });
 
   it('accepts a plain positive integer limit', () => {

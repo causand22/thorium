@@ -11,6 +11,7 @@ import {
   addTextOptions,
   emptyRegistry,
 } from './clauses/options';
+import { OmnibarContext } from './settingsRegistry';
 import { OmnibarSettings } from './urlState';
 import { TimeSelection } from './timepicker/utils';
 import { Group, GroupUserCategory } from '@models/groups';
@@ -78,7 +79,8 @@ export const OmnibarMainSearch: React.FC<OmnibarTimeContainerProps> = ({
       setTime={setTime}
       settings={settings}
       setSettings={setSettings}
-      hiddenTagOptions={Object.keys(tagOptions)}
+      settingsContext="search"
+      tagKeyOptions={Object.keys(tagOptions)}
       hashJump={hashJump}
     />
   );
@@ -90,7 +92,8 @@ export const OmnibarMainSearch: React.FC<OmnibarTimeContainerProps> = ({
  * Tags here can neither be negated nor OR'd — the census intersects one bucket stream per key/value
  * pair and requires every one to match.
  */
-export const OmnibarStandardTimeFilters: React.FC<OmnibarTimeContainerProps> = ({
+export const OmnibarStandardTimeFilters: React.FC<OmnibarTimeContainerProps & { context: Exclude<OmnibarContext, 'search'> }> = ({
+  context,
   clauses,
   setClauses,
   time,
@@ -118,7 +121,8 @@ export const OmnibarStandardTimeFilters: React.FC<OmnibarTimeContainerProps> = (
       setTime={setTime}
       settings={settings}
       setSettings={setSettings}
-      hiddenTagOptions={Object.keys(tagOptions)}
+      settingsContext={context}
+      tagKeyOptions={Object.keys(tagOptions)}
       hashJump={hashJump}
     />
   );

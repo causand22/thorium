@@ -3,6 +3,7 @@ import client from './client';
 // project imports
 import { Repo } from '@models/repos';
 import { Filters } from '@models/search';
+import { toListParams } from './params';
 
 interface ApiCursor<T> {
   cursor?: string;
@@ -24,10 +25,7 @@ export async function listReposDetails(
   cursor?: string | null,
 ): Promise<{ entityList: Repo[]; entityCursor: string | null }> {
   const url = '/repos/details/';
-  if (cursor) {
-    data['cursor'] = cursor;
-  }
-  return client.get<ApiCursor<Repo>>(url, { params: data }).then((res) => {
+  return client.get<ApiCursor<Repo>>(url, { params: toListParams(data, cursor) }).then((res) => {
     if (res?.status == 200 && res.data) {
       const cursor = res.data.cursor ?? null;
       return { entityList: res.data.data, entityCursor: cursor };

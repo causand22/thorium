@@ -4,6 +4,7 @@ import client, { parseRequestError } from './client';
 import { RequestTags, TagCounts } from '@models/tags';
 import { Sample, SampleSubmissionResponse } from '@models/files';
 import { Filters } from '@models/search';
+import { toListParams } from './params';
 
 // Debugging errors randomly inserted.
 // Valid values 0-100 (percentage chance of error)
@@ -37,11 +38,8 @@ export async function listFiles(
   if (details) {
     url += '/details/';
   }
-  if (cursor) {
-    data.cursor = cursor;
-  }
   return client
-    .get<ApiCursor<Sample>>(url, { params: data })
+    .get<ApiCursor<Sample>>(url, { params: toListParams(data, cursor) })
     .then((res) => {
       if (res?.status == 200 && res.data) {
         const cursor = res.data.cursor ?? null;
@@ -323,11 +321,8 @@ export async function countFileTags(
   cursor?: string | null,
 ): Promise<TagCounts | null> {
   const url = '/files/count/';
-  if (cursor) {
-    data.cursor = cursor;
-  }
   return client
-    .get<TagCounts>(url, { params: data })
+    .get<TagCounts>(url, { params: toListParams(data, cursor) })
     .then((res) => {
       if (res?.status == 200 && res.data) {
         return res.data;

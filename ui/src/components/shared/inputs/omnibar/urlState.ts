@@ -30,6 +30,14 @@ export function defaultOmnibarSettings(): OmnibarSettings {
   return { tagsCaseInsensitive: true, limit: 25, hiddenTags: [] };
 }
 
+/** Largest page size the UI will request. The API enforces no cap of its own, so this bounds it here. */
+export const MAX_LIMIT = 500;
+
+/** Clamp a page size into `1..=MAX_LIMIT`. */
+export function clampLimit(limit: number): number {
+  return Math.min(Math.max(limit, 1), MAX_LIMIT);
+}
+
 export type OmniState = { clauses: Clause[]; time: TimeSelection; settings: OmnibarSettings };
 
 // Param keys owned by the clause codec (excluding the dynamic `tags[KEY]` keys).
@@ -233,7 +241,8 @@ export function paramsToSettings(params: URLSearchParams, defaultSettings: Omnib
   const limitParam = params.get('limit');
   // a plain positive integer only: `Number()` alone would read '' as 0 and '1e3' as 1000
   const parsedLimit = limitParam !== null && /^\d+$/.test(limitParam) ? Number.parseInt(limitParam, 10) : 0;
-  const limit = parsedLimit > 0 ? parsedLimit : defaultSettings.limit;
+  // a hand-edited link can ask for any size, so clamp it just like the settings popover does
+  const limit = parsedLimit > 0 ? clampLimit(parsedLimit) : defaultSettings.limit;
 
   const caseParam = params.get('caseInsensitive');
   const tagsCaseInsensitive = caseParam === null ? defaultSettings.tagsCaseInsensitive : caseParam === '1';

@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router';
 // project imports
 import { getCreatePathByEntity } from '@components/entities/create/EntityCreateRoutes';
 import { OmnibarStandardTimeFilters } from '@components/shared/inputs/omnibar/Bars';
+import { OmnibarContext } from '@components/shared/inputs/omnibar/settingsRegistry';
 import { DEFAULT_HIDDEN_TAGS } from '@components/shared/inputs/omnibar/clauses/ClauseTypes';
 import { defaultOmnibarSettings } from '@components/shared/inputs/omnibar/urlState';
 import { useFileHashJump } from '@components/shared/inputs/omnibar/useFileHashJump';
@@ -16,6 +17,13 @@ import { Entities, entityLabel } from '@models/entities';
 import { Filters } from '@models/search';
 
 // spec: ../EntityBrowsing.spec.md
+
+// which settings apply depends on what is being listed: only file rows implement hidden tags
+function settingsContextFor(kind?: Entities): Exclude<OmnibarContext, 'search'> {
+  if (kind === Entities.File) return 'files';
+  if (kind === Entities.Repo) return 'repos';
+  return 'entities';
+}
 
 interface BrowsingFiltersProps {
   // callback invoked whenever the active filters change
@@ -90,6 +98,7 @@ const BrowsingFilters: React.FC<BrowsingFiltersProps> = ({
       <Row>
         <Col className="d-flex justify-content-center">
           <OmnibarStandardTimeFilters
+            context={settingsContextFor(kind)}
             clauses={clauses}
             setClauses={setClauses}
             time={time}

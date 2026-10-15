@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 // project imports
@@ -22,6 +22,11 @@ import type { ParamCodec } from './codecs';
 export function useUrlState<T>(codec: ParamCodec<T>, fallback: T): [T, (next: T | ((prev: T) => T)) => void] {
   const [searchParams, setSearchParams] = useSearchParams();
 
+  // Call sites build their codec and fallback inline, so these are new objects every render. Read them
+  // through a ref so the setter and the memos below always use the latest without re-running on identity.
+  const latest = useRef({ codec, fallback });
+  latest.current = { codec, fallback };
+
   const paramsString = searchParams.toString();
   // Narrow the full query string down to only the params THIS codec owns, so the decoded value stays
   // referentially stable when unrelated keys change. A codec composes with others on one URL (see
@@ -32,21 +37,25 @@ export function useUrlState<T>(codec: ParamCodec<T>, fallback: T): [T, (next: T 
     const all = new URLSearchParams(paramsString);
     const owned = new URLSearchParams();
     // dedupe: repeated params (e.g. `groups`) and dynamic keys (e.g. `tags[KEY]`) can appear more than once
-    new Set(codec.keys(all)).forEach((key) => {
+    new Set(latest.current.codec.keys(all)).forEach((key) => {
       all.getAll(key).forEach((value) => owned.append(key, value));
     });
     return owned.toString();
   }, [paramsString]);
-  // codec/fallback are expected to be stable for a given call site, so we key only on the owned params
+  // The decoded value depends on the owned params and on the fallback/defaults it fills in. Key on the
+  // fallback's *content* rather than its identity (it is rebuilt each render), so a call site whose
+  // defaults genuinely change re-decodes, but an unchanged one keeps a stable reference.
+  const fallbackKey = JSON.stringify(fallback);
   const value = useMemo(() => {
-    const decoded = codec.decode(new URLSearchParams(scopedString));
-    return decoded !== undefined ? decoded : fallback;
-  }, [scopedString]);
+    const decoded = latest.current.codec.decode(new URLSearchParams(scopedString));
+    return decoded !== undefined ? decoded : latest.current.fallback;
+  }, [scopedString, fallbackKey]);
 
   const setValue = useCallback(
     (next: T | ((prev: T) => T)) => {
       setSearchParams(
         (prev) => {
+          const { codec, fallback } = latest.current;
           const out = new URLSearchParams(prev);
           // resolve updater functions against the value currently in the URL (never stale)
           const resolved = typeof next === 'function' ? (next as (p: T) => T)(codec.decode(new URLSearchParams(prev)) ?? fallback) : next;

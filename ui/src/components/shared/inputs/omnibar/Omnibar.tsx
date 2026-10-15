@@ -6,6 +6,7 @@ import { OmnibarRegistry } from './clauses/parse';
 import OmnibarSettingsButton from './OmnibarSettingsButton';
 import SingleTimePicker from './timepicker/SingleTimePicker';
 import { TimeSelection } from './timepicker/utils';
+import { OmnibarContext, settingApplies } from './settingsRegistry';
 import { OmnibarSettings } from './urlState';
 
 // spec: ./SPEC.md
@@ -33,11 +34,15 @@ type OmnibarProps = {
   /** Time range state. Omit both `time` and `setTime` to render without a time picker. */
   time?: TimeSelection;
   setTime?: (next: TimeSelection) => void;
-  /** Request-shaping settings (case sensitivity, limit, hidden tags). Omit both to render without a settings button. */
+  /**
+   * Request-shaping settings. Omit `settings`, `setSettings` or `settingsContext` to render without a
+   * settings button. Only the settings that apply to `settingsContext` are shown or honored.
+   */
   settings?: OmnibarSettings;
   setSettings?: (next: OmnibarSettings) => void;
-  /** Tag keys offered in the settings popover's hidden-tags picker. */
-  hiddenTagOptions?: string[];
+  settingsContext?: OmnibarContext;
+  /** Tag keys offered by settings that pick tags (e.g. hidden tags). */
+  tagKeyOptions?: string[];
   /** Opt in to jumping straight to a file when Enter is pressed on a bare sha256. */
   hashJump?: HashJump;
 };
@@ -52,24 +57,30 @@ const Omnibar: React.FC<OmnibarProps> = ({
   setTime,
   settings,
   setSettings,
-  hiddenTagOptions = [],
+  settingsContext,
+  tagKeyOptions = [],
   hashJump,
 }) => {
+  // a stored case-sensitivity value is ignored where the setting isn't offered (e.g. search)
+  const tagsCaseInsensitive =
+    settings !== undefined && settingsContext !== undefined && settingApplies('tagsCaseInsensitive', settingsContext)
+      ? settings.tagsCaseInsensitive
+      : true;
   return (
     <OmnibarWrapperContainer>
       <ClauseEditor
         clauses={clauses}
         setClauses={setClauses}
         registry={registry}
-        tagsCaseInsensitive={settings?.tagsCaseInsensitive ?? true}
+        tagsCaseInsensitive={tagsCaseInsensitive}
         placeholder={placeholder}
         timepickerVisible={time !== undefined && setTime !== undefined}
         extraChips={extraChips}
         hashJump={hashJump}
       />
       {time !== undefined && setTime !== undefined && <SingleTimePicker time={time} setTime={setTime} />}
-      {settings !== undefined && setSettings !== undefined && (
-        <OmnibarSettingsButton settings={settings} setSettings={setSettings} hiddenTagOptions={hiddenTagOptions} />
+      {settings !== undefined && setSettings !== undefined && settingsContext !== undefined && (
+        <OmnibarSettingsButton settings={settings} setSettings={setSettings} context={settingsContext} tagKeyOptions={tagKeyOptions} />
       )}
     </OmnibarWrapperContainer>
   );
