@@ -349,12 +349,15 @@ a.dropdown-toggle.nav-link {
 .form-check-input {
   color: var(--thorium-text);
   background-color: var(--thorium-panel-bg);
-  border-color: var(--thorium-panel-border);
+  // a visible edge so an unchecked box stands out from the panel behind it
+  border-color: var(--thorium-secondary-text);
 
+  // 'on' is the theme's ok green and 'off' a neutral grey, so the two states read apart in every
+  // theme (the highlight colors were nearly the same as the panel background)
   &:checked {
     color: var(--thorium-text);
-    background-color: var(--thorium-highlight-panel-bg);
-    border-color: var(--thorium-highlight-panel-border);
+    background-color: var(--thorium-ok-bg);
+    border-color: var(--thorium-ok-bg);
     &:focus {
       --bs-form-switch-bg: url('data:image/svg+xml,<svg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%27-4 -4 8 8%27><circle r=%273%27 fill=%27white%27/></svg>') !important;
     }
@@ -365,11 +368,29 @@ a.dropdown-toggle.nav-link {
   }
 
   &:focus {
-    border-color: var(--thorium-panel-border);
+    border-color: var(--thorium-secondary-text);
     box-shadow:
       inset 0 0 1px var(--thorium-panel-border),
       0 0 6px var(--thorium-highlight-panel-border) !important;
     --bs-form-switch-bg: url('data:image/svg+xml,<svg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%27-4 -4 8 8%27><circle r=%273%27 fill=%27%27/></svg>') !important;
+  }
+}
+
+// switches: a grey track when off and a white knob in both states, against the green 'on' track above
+.form-switch .form-check-input {
+  &:not(:checked) {
+    background-color: var(--thorium-omnibar-border);
+    border-color: var(--thorium-omnibar-border);
+  }
+
+  &,
+  &:focus,
+  &:checked:focus {
+    --bs-form-switch-bg: url('data:image/svg+xml,<svg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%27-4 -4 8 8%27><circle r=%273%27 fill=%27white%27/></svg>') !important;
+  }
+
+  &:checked {
+    border-color: var(--thorium-ok-bg);
   }
 }
 
