@@ -1,5 +1,6 @@
 import styled from 'styled-components';
 import ClauseEditor from './clauses/ClauseEditor';
+import ClearClausesButton from './ClearClausesButton';
 import { Clause } from './clauses/ClauseTypes';
 import { HashJump } from './clauses/hash';
 import { OmnibarRegistry } from './clauses/parse';
@@ -78,6 +79,7 @@ const Omnibar: React.FC<OmnibarProps> = ({
         extraChips={extraChips}
         hashJump={hashJump}
       />
+      <ClearClausesButton clauses={clauses} setClauses={setClauses} />
       {time !== undefined && setTime !== undefined && <SingleTimePicker time={time} setTime={setTime} />}
       {settings !== undefined && setSettings !== undefined && settingsContext !== undefined && (
         <OmnibarSettingsButton settings={settings} setSettings={setSettings} context={settingsContext} tagKeyOptions={tagKeyOptions} />
