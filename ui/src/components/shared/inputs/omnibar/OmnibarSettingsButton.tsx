@@ -30,15 +30,13 @@ const SettingsPopover = styled(Popover)`
   color: var(--thorium-text);
 `;
 
+// a separator only between entries; `:first-child` can't be used because the popover renders its
+// arrow element before them
 const SettingsEntry = styled.div`
-  border-top: 1px solid var(--thorium-omnibar-border);
-  padding-top: 10px;
-  margin-top: 10px;
-
-  &:first-child {
-    border-top: none;
-    padding-top: 0;
-    margin-top: 0;
+  & + & {
+    border-top: 1px solid var(--thorium-omnibar-border);
+    padding-top: 10px;
+    margin-top: 10px;
   }
 `;
 
