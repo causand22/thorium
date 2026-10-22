@@ -239,9 +239,10 @@ export const DashboardContent: React.FC<DashboardContentProps> = ({ seed, depthA
     [navigate, location.search],
   );
 
-  // a clicked stats bar updates the shared clause list: tag-category clauses merge into the key's
-  // is-one-of set (so clicking several values on one key becomes one "any of" clause and clicking the
-  // same value twice toggles it off); non-tag (Include kind) clauses append once, deduped
+  // a clicked stats bar updates the shared clause list: tag-category clauses toggle through
+  // `toggleTagValue`, which emits one single-valued clause per selected value (the census ANDs values
+  // for one key) and clicking the same value twice toggles it off; non-tag (Include kind) clauses
+  // append once, deduped
   const onBarClick = useCallback(
     (clause: Clause) => {
       if (clause.category === 'tag') {

@@ -120,7 +120,7 @@ async function loadTagsFromApi() {
  * */
 export async function fetchLocalStorageTags() {
   let storageData: StorageType | null = null;
-  const storageDataString = localStorage.getItem('tagCounts');
+  const storageDataString = localStorage.getItem(LOCAL_STORAGE_KEY);
 
   //not present in local storage
   if (!storageDataString) {
@@ -156,7 +156,7 @@ export function clearTagDataFromLocalStorage() {
  * */
 export function loadTagOptionsFromLocalStorage(): TagOptions | null {
   let storageData: StorageType | null = null;
-  const storageDataString = localStorage.getItem('tagCounts');
+  const storageDataString = localStorage.getItem(LOCAL_STORAGE_KEY);
 
   if (!storageDataString) return null;
   //Try to load data string -- if corrupted return null

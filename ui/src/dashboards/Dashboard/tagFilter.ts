@@ -92,6 +92,37 @@ export function toggleTagValue(clauses: Clause[], key: string, value: string): C
 }
 
 /**
+ * The selected tag values per key — exactly the set {@link toggleTagValue} would toggle against.
+ *
+ * Deliberately colocated with {@link toggleTagValue} and recognising a tag clause on the same terms
+ * {@link isTagClauseForKey} does — category `tag`, any condition — because a chip's active state has
+ * to mirror what clicking it will do. Keeping the two apart is what previously let this matching stay
+ * on `is one of` after the toggle switched to emitting single-valued `is` clauses, which silently
+ * blanked every active chip.
+ *
+ * Built once per clause change (O(clauses) total) rather than scanned per rendered chip, so lookups
+ * against the returned map are O(1) while rendering.
+ *
+ * @param clauses - The current clause list.
+ * @returns A map from tag key to the set of its selected values; keys with no selection are absent.
+ */
+export function activeTagValues(clauses: Clause[]): Map<string, Set<string>> {
+  const active = new Map<string, Set<string>>();
+  for (const clause of clauses) {
+    if (clause.category !== TAG_CATEGORY) continue;
+    let values = active.get(clause.field);
+    if (values === undefined) {
+      values = new Set<string>();
+      active.set(clause.field, values);
+    }
+    for (const value of ClauseIsMulti(clause) ? clause.value.values : [clause.value.value]) {
+      values.add(value);
+    }
+  }
+  return active;
+}
+
+/**
  * Return only the clauses to keep when the user resets the dashboard filters.
  *
  * A reset clears the user's downselecting filters (tag filters, `Include` kind whitelists, free text,

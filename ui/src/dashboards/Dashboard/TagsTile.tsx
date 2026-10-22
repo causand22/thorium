@@ -7,11 +7,11 @@ import { FaChevronDown, FaChevronUp } from 'react-icons/fa6';
 import { useVisibleNodes } from './nodes';
 import { ALWAYS_HIDDEN_TAG_KEYS, collectTagCounts, type TagValueCount } from './tagCounts';
 import { EmptyTags, TagChip, TagChipCount, TagGroup, TagGroupKey, TagGroupValues, TagValuesToggle } from './styles';
-import { toggleTagValue } from './tagFilter';
+import { activeTagValues, toggleTagValue } from './tagFilter';
 import Collapsible, { TogglePosition } from '@components/shared/info/Collapsible';
 import { BalancedColumns, BalanceStrategy } from '@components/shared/layout/BalancedColumns';
 import { OverlayTipTop } from '@components/shared/overlay/tips';
-import { ClauseCondition, ClauseIsMulti, type Clause } from '@components/shared/inputs/omnibar/clauses/ClauseTypes';
+import { type Clause } from '@components/shared/inputs/omnibar/clauses/ClauseTypes';
 import { spacers } from '@styles';
 
 /// Props for {@link TagsTile}.
@@ -59,31 +59,6 @@ function tagValuesToggleLabel(collapsed: boolean): React.ReactNode {
       {collapsed ? <FaChevronDown size={12} aria-hidden /> : <FaChevronUp size={12} aria-hidden />}
     </TagValuesToggle>
   );
-}
-
-/**
- * Precompute the set of active (already-filtered) tag values per key from the clause list.
- *
- * Building this once per clause change is O(clauses) total, versus the previous per-chip
- * `isTagValueActive` scan that was O(clauses) *per rendered chip* (and called twice per chip). Lookups
- * against the returned map are then O(1) while rendering.
- *
- * @param clauses - The current clause list.
- * @returns A map from tag key to the set of its active `IsOneOf` values.
- */
-function activeTagValues(clauses: Clause[]): Map<string, Set<string>> {
-  const active = new Map<string, Set<string>>();
-  for (const clause of clauses) {
-    if (clause.category === 'tag' && clause.condition === ClauseCondition.IsOneOf && ClauseIsMulti(clause)) {
-      let values = active.get(clause.field);
-      if (values === undefined) {
-        values = new Set<string>();
-        active.set(clause.field, values);
-      }
-      for (const value of clause.value.values) values.add(value);
-    }
-  }
-  return active;
 }
 
 /// Props for {@link TagKeyTile}.
@@ -174,8 +149,10 @@ TagKeyTile.displayName = 'TagKeyTile';
  * value that no longer appears in the filtered view drops out) and over the whole `data_map` otherwise.
  * The display-hidden tag keys (the `hiddenTags` omnibar setting, defaulting to `Results`/`Parent`/`submitter`)
  * are excluded, as are the always-hidden high-cardinality keys ({@link ALWAYS_HIDDEN_TAG_KEYS}) which are
- * dropped unconditionally. Clicking a chip toggles its value into the key's single is-one-of filter via
- * {@link toggleTagValue}; already-filtered values render active and sort **first** within their tile so they
+ * dropped unconditionally. Clicking a chip toggles its value on or off for that key via
+ * {@link toggleTagValue}, which holds each selected value in its own single-valued tag clause; the active
+ * set comes back from {@link activeTagValues} so the highlight always mirrors what a click would undo.
+ * Already-filtered values render active and sort **first** within their tile so they
  * stay visible when the tile is collapsed. Each tile's value chips are wrapped in a shared {@link Collapsible}
  * run in controlled top-N mode (default collapsed): only the first {@link TAG_TILE_COLLAPSED_COUNT} values
  * are mounted while collapsed and the rest are mounted on expand — so a high-cardinality key never mounts

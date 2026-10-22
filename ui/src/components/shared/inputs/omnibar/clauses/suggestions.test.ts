@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ClauseCondition } from './ClauseTypes';
-import { OmnibarKey, OmnibarRegistry } from './parse';
+import { OmnibarKey, OmnibarRegistry, parseBuffer } from './parse';
 import { buildRows, ChoiceRow, operatorStageActiveRow, PendingKey, rowIsSelectable } from './suggestions';
 
 // spec: ../SPEC.md
@@ -83,6 +83,56 @@ describe('key rows', () => {
     expect(row.helpText).toBe('Use as a tag key');
     expect(row.insert).toBe('zzz');
     expect(row.pendingKey?.key.category).toBe('tag');
+  });
+});
+
+// `depth` is a reserved field that is NOT also a known tag key, so it reaches the invented-key path
+// while still being shadowed. A registry where every shadowed name is also a known tag (as `role` is)
+// cannot exercise this.
+describe('invented tag keys shadowed by a reserved field', () => {
+  function operatorRow(buffer: string, label: string, symbol: string): ChoiceRow {
+    const row = buildRows(buffer, registry, true, pendingFor(buffer, label))
+      .filter(rowIsSelectable)
+      .find((entry) => entry.helpText === symbol);
+    if (!row) throw new Error(`no '${symbol}' operator row for '${buffer}'`);
+    return row;
+  }
+
+  it('carries the `tag:` prefix, like a known shadowed tag does', () => {
+    const row = keyRowFor('depth', 'tag:depth');
+    expect(row.helpText).toBe('Use as a tag key');
+    expect(row.insert).toBe('tag:depth');
+    expect(row.pendingKey?.forcedTag).toBe(true);
+    expect(row.pendingKey?.key.category).toBe('tag');
+  });
+
+  it('leaves an unshadowed invented key unprefixed', () => {
+    expect(keyRowFor('zzz', 'zzz').pendingKey?.forcedTag).toBe(false);
+  });
+
+  // the defect this guards: unprefixed, the row wrote `depth=`, which resolves to the reserved field,
+  // so picking a row labelled "Use as a tag key" silently produced a *field* clause instead
+  it('writes a buffer that parses back to a tag clause, not the shadowing field', () => {
+    const { insert } = operatorRow('depth', 'tag:depth', '=');
+    expect(parseBuffer(`${insert}3`, registry, true).result).toEqual({
+      kind: 'clause',
+      clause: { category: 'tag', field: 'depth', condition: ClauseCondition.Is, value: { value: '3' } },
+    });
+  });
+
+  // the same defect's other face: the invented key inherits the tag template's operators, so an
+  // unprefixed row offered `!=` that the `depth` field rejects — the dropdown suggesting a parse error
+  it('offers `!=` from the tag template and that operator parses', () => {
+    const { insert } = operatorRow('depth', 'tag:depth', '!=');
+    expect(insert).toBe('tag:depth!=');
+    expect(parseBuffer(`${insert}3`, registry, true).result).toEqual({
+      kind: 'clause',
+      clause: { category: 'tag', field: 'depth', condition: ClauseCondition.IsNot, value: { value: '3' } },
+    });
+  });
+
+  it('still offers the reserved field itself as its own row', () => {
+    expect(keyRowFor('depth', 'depth').insert).toBe('depth=');
   });
 });
 

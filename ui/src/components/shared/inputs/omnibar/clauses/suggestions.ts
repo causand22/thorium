@@ -199,7 +199,12 @@ function buildKeyRows(state: BufferState, buffer: string, registry: OmnibarRegis
   // offer the typed key as a brand-new tag key when it doesn't match one we know
   const trimmed = draft.trim();
   if (registry.tagTemplate && trimmed !== '' && !registry.tags.some((key) => key.key.toLowerCase() === trimmed.toLowerCase())) {
-    rows.push({ ...keyRow(inventedTagKey(trimmed, registry.tagTemplate), forcedTag), helpText: 'Use as a tag key' });
+    // a reserved field of this name would shadow the invented key, so it needs the prefix for the same
+    // reason a known shadowed tag does — without it the row writes a buffer that parses as the *field*,
+    // and offers whatever operators the tag template allows rather than the field's
+    const needsPrefix = forcedTag || shadowed.has(trimmed.toLowerCase());
+    const row = keyRow(inventedTagKey(trimmed, registry.tagTemplate), needsPrefix);
+    rows.push({ ...row, label: needsPrefix ? `${TAG_PREFIX}${trimmed}` : row.label, helpText: 'Use as a tag key' });
   }
 
   // free text is reachable only by typing a bare word, so advertise it rather than offering a `text=`

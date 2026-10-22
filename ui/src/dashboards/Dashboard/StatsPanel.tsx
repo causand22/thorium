@@ -69,8 +69,8 @@ export interface StatsPanelProps {
  *   (whitelist) clause for that node type via `onBarClick`.
  * - **Tag-values chart** shows value counts for a configurable tag key ({@link countTagKey}), defaulting to
  *   `FileType` with `FileTypeExtension` and `MIMEType` also offered via a small key picker (component
- *   state). Clicking a bar toggles the value into the key's single is-one-of tag clause via
- *   {@link toggleTagValue}.
+ *   state). Clicking a bar toggles the value on or off for that key via {@link toggleTagValue}, which
+ *   holds each selected value in its own single-valued tag clause.
  *
  * @param clauses - The shared clause list.
  * @param setClauses - Setter for the shared clause list (used by tag-value clicks).
@@ -116,7 +116,7 @@ const StatsPanel: React.FC<StatsPanelProps> = ({ clauses, setClauses, onBarClick
     onBarClick(makeIncludeClause(id));
   };
 
-  // a Tag-values bar click toggles the value into the key's single is-one-of clause (merging same-key clicks)
+  // a Tag-values bar click toggles the value on or off for this key, as its own single-valued clause
   const onTagClick = (value: string): void => {
     setClauses(toggleTagValue(clauses, tagKey, value));
   };

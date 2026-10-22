@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 // project imports
-import { resetFilterClauses, toggleTagValue } from './tagFilter';
+import { activeTagValues, resetFilterClauses, toggleTagValue } from './tagFilter';
 import { ClauseCondition, type Clause } from '@components/shared/inputs/omnibar/clauses/ClauseTypes';
 
 // spec: ./SPEC.md
@@ -84,6 +84,52 @@ describe('toggleTagValue', () => {
   it('toggling the same value twice removes it', () => {
     const once = toggleTagValue([], 'FileType', 'PE32');
     expect(toggleTagValue(once, 'FileType', 'PE32')).toEqual([]);
+  });
+});
+
+describe('activeTagValues', () => {
+  const valuesFor = (clauses: Clause[], key: string) => Array.from(activeTagValues(clauses).get(key) ?? []);
+
+  it('reports no active values for an empty clause list', () => {
+    expect(activeTagValues([]).size).toBe(0);
+  });
+
+  // the regression: toggleTagValue emits single-value `Is` clauses, so matching only `IsOneOf` here
+  // reported nothing active and blanked every chip's highlight
+  it('reports single-value `is` clauses as active', () => {
+    expect(valuesFor([tagClause('FileType', 'PE32')], 'FileType')).toEqual(['PE32']);
+  });
+
+  it('reports a legacy multi-value clause from an older link as active', () => {
+    expect(valuesFor([legacyMultiTagClause('FileType', ['PE32', 'ELF'])], 'FileType')).toEqual(['PE32', 'ELF']);
+  });
+
+  it('keeps each key separate and ignores non-tag clauses', () => {
+    const clauses = [tagClause('FileType', 'PE32'), tagClause('arch', 'x86'), includeClause('File'), depthClause(3)];
+    const active = activeTagValues(clauses);
+    expect(Array.from(active.keys()).sort()).toEqual(['FileType', 'arch']);
+    expect(valuesFor(clauses, 'FileType')).toEqual(['PE32']);
+    expect(valuesFor(clauses, 'arch')).toEqual(['x86']);
+  });
+
+  // the invariant that ties the two together: a chip is highlighted exactly when clicking it would
+  // toggle the value back off. Asserting it here is what stops the pair drifting apart again.
+  it('stays in lockstep with toggleTagValue across a toggle on and off', () => {
+    const on = toggleTagValue([], 'FileType', 'PE32');
+    expect(valuesFor(on, 'FileType')).toEqual(['PE32']);
+
+    const both = toggleTagValue(on, 'FileType', 'ELF');
+    expect(valuesFor(both, 'FileType').sort()).toEqual(['ELF', 'PE32']);
+
+    const off = toggleTagValue(both, 'FileType', 'PE32');
+    expect(valuesFor(off, 'FileType')).toEqual(['ELF']);
+
+    expect(activeTagValues(toggleTagValue(off, 'FileType', 'ELF')).size).toBe(0);
+  });
+
+  it('reports a legacy multi-value clause as active after it is normalised by a toggle', () => {
+    const normalised = toggleTagValue([legacyMultiTagClause('FileType', ['PE32', 'ELF'])], 'FileType', 'MachO');
+    expect(valuesFor(normalised, 'FileType')).toEqual(['PE32', 'ELF', 'MachO']);
   });
 });
 

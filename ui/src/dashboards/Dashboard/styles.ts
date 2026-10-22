@@ -472,17 +472,6 @@ export const TileHeaderRow = styled.div`
   gap: ${spacers.three};
 `;
 
-/**
- * The right-hand actions cluster of a {@link TileHeaderRow}: keeps header-level controls (e.g. the entity
- * sort/group controls) grouped together immediately before the pane expand toggle, rather than being spread
- * apart by the row's `space-between`.
- */
-export const TileHeaderActions = styled.div`
-  display: inline-flex;
-  align-items: center;
-  gap: ${spacers.three};
-`;
-
 /// The stats tile container (a panel that always spans the full stats row).
 export const StatsTile = styled.div`
   background: var(--thorium-panel-bg);
