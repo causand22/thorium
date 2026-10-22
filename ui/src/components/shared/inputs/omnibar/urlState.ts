@@ -12,7 +12,7 @@
  */
 
 // project imports
-import { Clause, ClauseCondition, ClauseIsMulti, CondIsMulti, NewTextClause, parseClauseCondition } from './clauses/ClauseTypes';
+import { Clause, ClauseCondition, clauseValues, CondIsMulti, NewTextClause, parseClauseCondition } from './clauses/ClauseTypes';
 import { RelativeUnit, TimeSelection } from './timepicker/utils';
 import type { ParamCodec } from '@utilities/url/codecs';
 
@@ -64,11 +64,6 @@ const UNIT_TO_ABBR: Record<RelativeUnit, string> = {
 const ABBR_TO_UNIT: Record<string, RelativeUnit> = Object.fromEntries(
   Object.entries(UNIT_TO_ABBR).map(([unit, abbr]) => [abbr, unit as RelativeUnit]),
 );
-
-// pull every value off a clause regardless of single/multi shape
-function clauseValues(clause: Clause): string[] {
-  return ClauseIsMulti(clause) ? clause.value.values : [clause.value.value];
-}
 
 // build a correctly-typed clause from raw parts, choosing single vs multi by condition
 function makeClause(category: string, field: string, condition: ClauseCondition, values: string[]): Clause {

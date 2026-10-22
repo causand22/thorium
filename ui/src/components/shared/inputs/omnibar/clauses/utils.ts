@@ -1,22 +1,21 @@
 /**
- * Turning committed clauses into backend requests.
+ * What the rest of the app does with committed clauses, in three groups:
  *
- * The dropdown lives in ./suggestions.ts and the grammar in ./parse.ts; this module is only the
- * clause → request-parameter direction.
+ * - Request builders: `getSearchTextFromClauses` for Elastic, and the `get*FromClauses` extractors for
+ *   the list APIs.
+ * - Client-side matchers (`matches*Clauses`) for pages that filter an already-loaded list.
+ * - `getClauseColorClass`, the chip's display class.
+ *
+ * The dropdown lives in ./suggestions.ts and the grammar in ./parse.ts.
  */
 
 // project imports
-import { Clause, ClauseCondition, ClauseIsMulti, GetValueString } from './ClauseTypes';
+import { Clause, ClauseCondition, ClauseIsMulti, clauseValues, GetValueString } from './ClauseTypes';
 import { getTagColorClass } from '@components/tags';
 import { ElasticIndex } from '@models/search';
 import { RequestTags } from '@models/tags';
 
 // spec: ../SPEC.md
-
-/** Every value on a clause, regardless of its single/multi shape. */
-function clauseValues(clause: Clause): string[] {
-  return ClauseIsMulti(clause) ? clause.value.values : [clause.value.value];
-}
 
 /** The free-text clause, as built by `NewTextClause`. A tag keyed `text` is a tag, not free text. */
 function isTextClause(clause: Clause): boolean {
@@ -30,6 +29,8 @@ function isTextClause(clause: Clause): boolean {
 function targetsField(clause: Clause, field: string): boolean {
   return clause.category !== 'tag' && clause.field === field;
 }
+
+// ---- request builders ---------------------------------------------------------------------------
 
 /**
  * Quote a term for Elastic's `query_string`, escaping what would otherwise end the phrase.
@@ -134,6 +135,18 @@ export function getTagsFromClauses(clauses: Clause[]): RequestTags {
   return tags;
 }
 
+export function getStringFieldListFromClauses(clauses: Clause[], field: string): string[] {
+  const result: string[] = [];
+  clauses
+    .filter((clause) => targetsField(clause, field))
+    .forEach((clause) => {
+      result.push(...clauseValues(clause));
+    });
+  return result;
+}
+
+// ---- client-side matchers -----------------------------------------------------------------------
+
 /**
  * Test whether a string `value` satisfies every clause targeting `field`, honoring each clause's
  * condition: `includes` is a (case-sensitive) substring match, `is not` excludes, a multi-value
@@ -182,15 +195,7 @@ export function matchesListClauses(clauses: Clause[], field: string, candidates:
   return included.length === 0 || included.some((value) => candidates.includes(value));
 }
 
-export function getStringFieldListFromClauses(clauses: Clause[], field: string): string[] {
-  const result: string[] = [];
-  clauses
-    .filter((clause) => targetsField(clause, field))
-    .forEach((clause) => {
-      result.push(...clauseValues(clause));
-    });
-  return result;
-}
+// ---- display ------------------------------------------------------------------------------------
 
 export function getClauseColorClass(clause: Clause): string {
   if (clause.category === 'tag') {

@@ -32,9 +32,13 @@ import { RoleKey, UserInfo } from '@models/users';
 const CLIENT_SIDE_TEXT = [ClauseCondition.Includes, ClauseCondition.Is, ClauseCondition.IsNot];
 const CLIENT_SIDE_LIST = [ClauseCondition.Is, ClauseCondition.IsOneOf, ClauseCondition.IsNot];
 
-type OmnibarTimeContainerProps = {
+/** What every bar needs: the clause list it edits. */
+type BarProps = {
   clauses: Clause[];
   setClauses: (next: Clause[]) => void;
+};
+
+type OmnibarTimeContainerProps = BarProps & {
   time: TimeSelection;
   setTime: (next: TimeSelection) => void;
   settings: OmnibarSettings;
@@ -43,48 +47,48 @@ type OmnibarTimeContainerProps = {
   hashJump?: HashJump;
 };
 
+const CLIENT_SIDE_PLACEHOLDER = 'Enter a filter...';
+
+/** The groups the signed-in user belongs to, which is what the group key suggests. */
+function useUserGroups(): string[] {
+  const { userInfo } = useAuth();
+  return userInfo !== null ? userInfo.groups : [];
+}
+
+/**
+ * The bar behind both Scylla-backed browse pages and Elastic-backed search. They differ only in the
+ * vocabulary (search adds `index` and free text and can negate tags) and the settings context.
+ */
+const OmnibarTagTimeBar: React.FC<OmnibarTimeContainerProps & { context: OmnibarContext }> = ({ context, ...props }) => {
+  const groups = useUserGroups();
+  const tagOptions = useTagCount();
+  const keyTotals = useTagKeyTotals();
+  const isSearch = context === 'search';
+
+  let registry = emptyRegistry();
+  registry = addGroupOptions(registry, groups);
+  if (isSearch) registry = addIndexOptions(registry);
+  registry = addTagOptions(registry, tagOptions, { negatable: isSearch, keyTotals });
+  if (isSearch) registry = addTextOptions(registry);
+
+  return (
+    <Omnibar
+      {...props}
+      registry={registry}
+      placeholder={isSearch ? 'Search...' : CLIENT_SIDE_PLACEHOLDER}
+      settingsContext={context}
+      tagKeyOptions={Object.keys(tagOptions)}
+    />
+  );
+};
+
 /**
  * The main search bar, backed by Elasticsearch (`/api/search/`).
  *
  * The only bar where tags can be negated: the query reaches Elastic as a Lucene `query_string`, which
  * supports `NOT`, whereas the Scylla list routes can only intersect census buckets.
  */
-export const OmnibarMainSearch: React.FC<OmnibarTimeContainerProps> = ({
-  clauses,
-  setClauses,
-  time,
-  setTime,
-  settings,
-  setSettings,
-  hashJump,
-}) => {
-  const { userInfo } = useAuth();
-  const userInfoGroups = userInfo !== null ? userInfo.groups : [];
-  const tagOptions = useTagCount();
-  const keyTotals = useTagKeyTotals();
-
-  let registry = emptyRegistry();
-  registry = addGroupOptions(registry, userInfoGroups);
-  registry = addIndexOptions(registry);
-  registry = addTagOptions(registry, tagOptions, { negatable: true, keyTotals });
-  registry = addTextOptions(registry);
-
-  return (
-    <Omnibar
-      clauses={clauses}
-      registry={registry}
-      setClauses={setClauses}
-      placeholder="Search..."
-      time={time}
-      setTime={setTime}
-      settings={settings}
-      setSettings={setSettings}
-      settingsContext="search"
-      tagKeyOptions={Object.keys(tagOptions)}
-      hashJump={hashJump}
-    />
-  );
-};
+export const OmnibarMainSearch: React.FC<OmnibarTimeContainerProps> = (props) => <OmnibarTagTimeBar {...props} context="search" />;
 
 /**
  * The browse/filter bar for files, repos and entities, backed by the Scylla list routes.
@@ -92,47 +96,11 @@ export const OmnibarMainSearch: React.FC<OmnibarTimeContainerProps> = ({
  * Tags here can neither be negated nor OR'd — the census intersects one bucket stream per key/value
  * pair and requires every one to match.
  */
-export const OmnibarStandardTimeFilters: React.FC<OmnibarTimeContainerProps & { context: Exclude<OmnibarContext, 'search'> }> = ({
-  context,
-  clauses,
-  setClauses,
-  time,
-  setTime,
-  settings,
-  setSettings,
-  hashJump,
-}) => {
-  const { userInfo } = useAuth();
-  const userInfoGroups = userInfo !== null ? userInfo.groups : [];
-  const tagOptions = useTagCount();
-  const keyTotals = useTagKeyTotals();
+export const OmnibarStandardTimeFilters: React.FC<OmnibarTimeContainerProps & { context: Exclude<OmnibarContext, 'search'> }> = (props) => (
+  <OmnibarTagTimeBar {...props} />
+);
 
-  let registry = emptyRegistry();
-  registry = addGroupOptions(registry, userInfoGroups);
-  registry = addTagOptions(registry, tagOptions, { keyTotals });
-
-  return (
-    <Omnibar
-      clauses={clauses}
-      registry={registry}
-      setClauses={setClauses}
-      placeholder="Enter a filter..."
-      time={time}
-      setTime={setTime}
-      settings={settings}
-      setSettings={setSettings}
-      settingsContext={context}
-      tagKeyOptions={Object.keys(tagOptions)}
-      hashJump={hashJump}
-    />
-  );
-};
-
-interface OmnibarGroupProps {
-  clauses: Clause[];
-  setClauses: (next: Clause[]) => void;
-  groups: Record<string, Group>;
-}
+type OmnibarGroupProps = BarProps & { groups: Record<string, Group> };
 
 function getGroupMemberType(groups: Record<string, Group>, category: GroupUserCategory): string[] {
   const allStrings = Object.values(groups).map((g) => getAllGroupUsers(g[category]));
@@ -140,34 +108,24 @@ function getGroupMemberType(groups: Record<string, Group>, category: GroupUserCa
 }
 
 export function OmnibarGroups({ clauses, setClauses, groups }: OmnibarGroupProps) {
-  const { userInfo } = useAuth();
-  const userInfoGroups = userInfo !== null ? userInfo.groups : [];
-
   let registry = emptyRegistry();
-  registry = addGroupOptions(registry, userInfoGroups);
+  registry = addGroupOptions(registry, useUserGroups());
   registry = addStringOption(registry, 'Owners', getGroupMemberType(groups, 'owners'), CLIENT_SIDE_LIST, { orCapable: true });
   registry = addStringOption(registry, 'Users', getGroupMemberType(groups, 'users'), CLIENT_SIDE_LIST, { orCapable: true });
   registry = addStringOption(registry, 'Managers', getGroupMemberType(groups, 'managers'), CLIENT_SIDE_LIST, { orCapable: true });
 
-  return <Omnibar clauses={clauses} registry={registry} setClauses={setClauses} placeholder="Enter a filter..." />;
+  return <Omnibar clauses={clauses} registry={registry} setClauses={setClauses} placeholder={CLIENT_SIDE_PLACEHOLDER} />;
 }
 
-interface OmnibarPipelineProps {
-  clauses: Clause[];
-  setClauses: (next: Clause[]) => void;
-  pipelines: Pipeline[];
-}
+type OmnibarPipelineProps = BarProps & { pipelines: Pipeline[] };
 
 function uniqueSort(list: string[]): string[] {
   return Array.from(new Set(list)).sort();
 }
 
 export function OmnibarPipelines({ clauses, setClauses, pipelines }: OmnibarPipelineProps) {
-  const { userInfo } = useAuth();
-  const userInfoGroups = userInfo !== null ? userInfo.groups : [];
-
   let registry = emptyRegistry();
-  registry = addGroupOptions(registry, userInfoGroups);
+  registry = addGroupOptions(registry, useUserGroups());
   registry = addStringOption(
     registry,
     'name',
@@ -176,14 +134,10 @@ export function OmnibarPipelines({ clauses, setClauses, pipelines }: OmnibarPipe
   );
   registry = addStringOption(registry, 'creator', uniqueSort(pipelines.map((pipeline) => pipeline.creator)), CLIENT_SIDE_TEXT);
 
-  return <Omnibar clauses={clauses} registry={registry} setClauses={setClauses} placeholder="Enter a filter..." />;
+  return <Omnibar clauses={clauses} registry={registry} setClauses={setClauses} placeholder={CLIENT_SIDE_PLACEHOLDER} />;
 }
 
-interface OmnibarUserProps {
-  clauses: Clause[];
-  setClauses: (next: Clause[]) => void;
-  users: UserInfo[];
-}
+type OmnibarUserProps = BarProps & { users: UserInfo[] };
 
 export function OmnibarUsers({ clauses, setClauses, users }: OmnibarUserProps) {
   let registry = emptyRegistry();
@@ -202,24 +156,17 @@ export function OmnibarUsers({ clauses, setClauses, users }: OmnibarUserProps) {
   registry = addStringOption(registry, 'verified', ['true', 'false'], [ClauseCondition.Is], { creatable: false });
   registry = addStringOption(registry, 'local', ['true', 'false'], [ClauseCondition.Is], { creatable: false });
 
-  return <Omnibar clauses={clauses} registry={registry} setClauses={setClauses} placeholder="Enter a filter..." />;
+  return <Omnibar clauses={clauses} registry={registry} setClauses={setClauses} placeholder={CLIENT_SIDE_PLACEHOLDER} />;
 }
 
-interface OmnibarImageProps {
-  clauses: Clause[];
-  setClauses: (next: Clause[]) => void;
-  images: Image[];
-}
+type OmnibarImageProps = BarProps & { images: Image[] };
 
 export function OmnibarImages({ clauses, setClauses, images }: OmnibarImageProps) {
-  const { userInfo } = useAuth();
-  const userInfoGroups = userInfo !== null ? userInfo.groups : [];
-
   let registry = emptyRegistry();
-  registry = addGroupOptions(registry, userInfoGroups);
+  registry = addGroupOptions(registry, useUserGroups());
   registry = addTextOptions(registry);
   registry = addStringOption(registry, 'creator', uniqueSort(images.map((image) => image.creator)), CLIENT_SIDE_TEXT);
   registry = addStringOption(registry, 'name', uniqueSort(images.map((image) => image.name)), CLIENT_SIDE_TEXT);
 
-  return <Omnibar clauses={clauses} registry={registry} setClauses={setClauses} placeholder="Enter a filter..." />;
+  return <Omnibar clauses={clauses} registry={registry} setClauses={setClauses} placeholder={CLIENT_SIDE_PLACEHOLDER} />;
 }

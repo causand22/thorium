@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 
 // project imports
-import { commitSettings, OmnibarContext, parseLimitInput, settingApplies, settingsForContext, toggleKey } from './settingsRegistry';
+import { commitSettings, OmnibarContext, settingApplies, settingsForContext } from './settingsRegistry';
+import { toggleKey } from './settingsControls/HiddenTagsControl';
+import { parseLimitInput } from './settingsControls/LimitControl';
 import { defaultOmnibarSettings, MAX_LIMIT } from './urlState';
 
 const keysFor = (context: OmnibarContext) => settingsForContext(context).flatMap((entry) => entry.keys);

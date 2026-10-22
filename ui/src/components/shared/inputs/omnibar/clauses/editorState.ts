@@ -8,7 +8,7 @@
  */
 
 // project imports
-import { Clause, ClauseCondition, ClauseIsMulti } from './ClauseTypes';
+import { Clause, ClauseCondition, clauseValues } from './ClauseTypes';
 import { clausesEqual, OmnibarRegistry, parseBuffer, resolveKey, serializeClause } from './parse';
 import { sanitizePastedText, splitPastedSegments } from './paste';
 import {
@@ -71,10 +71,6 @@ export function initialEditorState(): EditorState {
 }
 
 // ---- merging ------------------------------------------------------------------------------------
-
-function clauseValues(clause: Clause): string[] {
-  return ClauseIsMulti(clause) ? clause.value.values : [clause.value.value];
-}
 
 /** The only conditions that union cleanly; `!=` and `~` change meaning if folded into a list. */
 const MERGEABLE_CONDITIONS: ClauseCondition[] = [ClauseCondition.Is, ClauseCondition.IsOneOf];

@@ -1,4 +1,4 @@
-import { KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { KeyboardEvent, useMemo, useRef, useState } from 'react';
 import styled from 'styled-components';
 import OmnibarDropdown, { dropdownHasContent } from './Dropdown';
 import OmnibarEntryField from './OmnibarEntryField';
@@ -8,6 +8,7 @@ import { EditorAction, EditorContext, initialEditorState, reduceEditor } from '.
 import { asBareSha256, HashJump } from './hash';
 import { OmnibarRegistry, parseBuffer, serializeClause } from './parse';
 import { buildRows, DropdownRow } from './suggestions';
+import { useHashLookup } from './useHashLookup';
 
 // spec: ../SPEC.md
 
@@ -49,7 +50,6 @@ type ClauseEditorProps = {
 };
 
 const LOOKING_UP_ROWS: DropdownRow[] = [{ kind: 'hint', label: 'Looking up file…' }];
-const HASH_NOT_FOUND = 'No file found with that sha256';
 const HASH_BANNER = 'Looks like a sha256 hash. Press Enter to look it up and open the file.';
 
 const ClauseEditor: React.FC<ClauseEditorProps> = ({
@@ -63,70 +63,22 @@ const ClauseEditor: React.FC<ClauseEditorProps> = ({
   hashJump,
 }) => {
   const [state, setState] = useState(initialEditorState());
-  // the sha256 being looked up, or null. Kept outside the reducer because it is an async side effect
-  const [lookingUp, setLookingUp] = useState<string | null>(null);
-  const [hashMiss, setHashMiss] = useState<string | undefined>(undefined);
-  // bumped to invalidate a lookup in flight: any edit, blur or Escape means the answer is no longer wanted
-  const lookupToken = useRef(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const ctx: EditorContext = { clauses, registry, tagsCaseInsensitive };
 
-  function cancelHashLookup() {
-    lookupToken.current += 1;
-    setLookingUp(null);
-    setHashMiss(undefined);
-  }
+  // the sha256 lookup is an async side effect, so it lives outside the reducer
+  const hashLookup = useHashLookup(hashJump, !!registry.text, () => dispatch({ type: 'enter' }));
+  const { lookingUp } = hashLookup;
 
   function dispatch(action: EditorAction) {
     // focus and hover leave the buffer alone; everything else makes a pending lookup stale
-    if (action.type !== 'focus' && action.type !== 'hoverRow') cancelHashLookup();
+    if (action.type !== 'focus' && action.type !== 'hoverRow') hashLookup.cancel();
     const result = reduceEditor(state, action, ctx);
     setState(result.state);
     if (result.clauses) setClauses(result.clauses);
-  }
-
-  // the async callback below outlives the render that started it, so it dispatches through this
-  const latestDispatch = useRef(dispatch);
-  useEffect(() => {
-    latestDispatch.current = dispatch;
-  });
-
-  // a lookup still running when the editor unmounts must not navigate
-  useEffect(() => {
-    const token = lookupToken;
-    return () => {
-      token.current += 1;
-    };
-  }, []);
-
-  /**
-   * Check that the file exists, then open it. On a miss a bar with free text commits the hash as an
-   * ordinary text chip, as Enter would have; a bar with none shows a message instead, since the hash
-   * can't become a chip.
-   */
-  function startHashLookup(sha256: string) {
-    if (!hashJump) return;
-    const token = lookupToken.current + 1;
-    lookupToken.current = token;
-    setLookingUp(sha256);
-    setHashMiss(undefined);
-    void hashJump
-      .lookup(sha256)
-      .catch(() => false)
-      .then((found) => {
-        if (token !== lookupToken.current) return;
-        setLookingUp(null);
-        if (found) {
-          hashJump.open(sha256);
-        } else if (!registry.text) {
-          setHashMiss(HASH_NOT_FOUND);
-        } else {
-          latestDispatch.current({ type: 'enter' });
-        }
-      });
   }
 
   const rows = useMemo(
@@ -138,7 +90,7 @@ const ClauseEditor: React.FC<ClauseEditorProps> = ({
     [state.buffer, registry, tagsCaseInsensitive],
   );
 
-  const errorMessage = (parsed.result.kind === 'error' ? parsed.result.message : undefined) ?? hashMiss;
+  const errorMessage = (parsed.result.kind === 'error' ? parsed.result.message : undefined) ?? hashLookup.miss;
 
   // the hash Enter will look up, if any. A highlighted row, an operator stage, an in-place chip edit or
   // a lookup already running all mean Enter has another job
@@ -155,7 +107,7 @@ const ClauseEditor: React.FC<ClauseEditorProps> = ({
         // a lookup is already deciding what this Enter would do
         if (lookingUp !== null) break;
         if (enterHash) {
-          startHashLookup(enterHash);
+          hashLookup.start(enterHash);
         } else {
           dispatch({ type: 'enter' });
         }
@@ -221,7 +173,8 @@ const ClauseEditor: React.FC<ClauseEditorProps> = ({
         onBeginEdit={(index) => dispatch({ type: 'editChip', index })}
         onDelete={(index) => dispatch({ type: 'deleteChip', index })}
         onContainerClick={() => dispatch({ type: 'focus' })}
-        onMultiPaste={(mergedText) => dispatch({ type: 'pasteMulti', mergedText })}        inputRef={inputRef}
+        onMultiPaste={(mergedText) => dispatch({ type: 'pasteMulti', mergedText })}
+        inputRef={inputRef}
         extraChips={extraChips}
       />
       {errorMessage && <ErrorMessage role="alert">{errorMessage}</ErrorMessage>}

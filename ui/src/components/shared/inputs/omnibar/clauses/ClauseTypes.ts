@@ -61,6 +61,11 @@ export function CondIsMulti(cond: ClauseCondition): cond is MultiCondition {
   return (multiConditions as readonly ClauseCondition[]).includes(cond);
 }
 
+/** Every value on a clause, regardless of its single/multi shape. */
+export function clauseValues(clause: Clause): string[] {
+  return ClauseIsMulti(clause) ? clause.value.values : [clause.value.value];
+}
+
 export function GetValueString(clause: Clause): string {
   if (ClauseIsMulti(clause)) {
     return clause.value.values.join(', ');
