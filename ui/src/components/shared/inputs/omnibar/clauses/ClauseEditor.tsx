@@ -133,10 +133,7 @@ const ClauseEditor: React.FC<ClauseEditorProps> = ({
     () => (lookingUp !== null ? LOOKING_UP_ROWS : buildRows(state.buffer, registry, tagsCaseInsensitive, state.pendingKey)),
     [lookingUp, state.buffer, registry, tagsCaseInsensitive, state.pendingKey],
   );
-  const parsed = useMemo(
-    () => parseBuffer(state.buffer, registry, tagsCaseInsensitive),
-    [state.buffer, registry, tagsCaseInsensitive],
-  );
+  const parsed = useMemo(() => parseBuffer(state.buffer, registry, tagsCaseInsensitive), [state.buffer, registry, tagsCaseInsensitive]);
 
   const errorMessage = (parsed.result.kind === 'error' ? parsed.result.message : undefined) ?? hashMiss;
 
@@ -221,7 +218,8 @@ const ClauseEditor: React.FC<ClauseEditorProps> = ({
         onBeginEdit={(index) => dispatch({ type: 'editChip', index })}
         onDelete={(index) => dispatch({ type: 'deleteChip', index })}
         onContainerClick={() => dispatch({ type: 'focus' })}
-        onMultiPaste={(mergedText) => dispatch({ type: 'pasteMulti', mergedText })}        inputRef={inputRef}
+        onMultiPaste={(mergedText) => dispatch({ type: 'pasteMulti', mergedText })}
+        inputRef={inputRef}
         extraChips={extraChips}
       />
       {errorMessage && <ErrorMessage role="alert">{errorMessage}</ErrorMessage>}

@@ -113,15 +113,18 @@ const OmnibarEntryField: React.FC<OmnibarEntryFieldProps> = ({
       onChange={onBufferChange}
       onKeyDown={onKeyDown}
       onFocus={onFocus}
-      onMultiPaste={allowMultiPaste ? onMultiPaste : undefined}    />
+      onMultiPaste={allowMultiPaste ? onMultiPaste : undefined}
+    />
   );
 
   return (
     <OmnibarEntryFieldDiv $dropdownVisible={dropdownVisible} $timepickerVisible={timepickerVisible} $invalid={invalid}>
-      <ClauseContainer onClick={() => {
-        onContainerClick();
-        inputRef.current?.focus();
-      }}>
+      <ClauseContainer
+        onClick={() => {
+          onContainerClick();
+          inputRef.current?.focus();
+        }}
+      >
         {clauses.map((clause, idx) =>
           // the chip under edit is replaced in place by the buffer input, so clause order is preserved
           idx === editingIndex ? (
