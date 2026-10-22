@@ -28,11 +28,7 @@ describe('OmniClauseAndTimeToFilter', () => {
   });
 
   it('extracts tag clauses into Filters.tags', () => {
-    const clauses: Clause[] = [
-      single('tag', 'family', 'emotet'),
-      single('tag', 'family', 'trickbot'),
-      single('tag', 'av', 'malicious'),
-    ];
+    const clauses: Clause[] = [single('tag', 'family', 'emotet'), single('tag', 'family', 'trickbot'), single('tag', 'av', 'malicious')];
     const filter = OmniClauseAndTimeToFilter(clauses, { mode: 'all' }, defaultOmnibarSettings());
     expect(filter.tags).toEqual({ family: ['emotet', 'trickbot'], av: ['malicious'] });
   });

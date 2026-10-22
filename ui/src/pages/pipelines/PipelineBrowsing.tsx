@@ -107,7 +107,7 @@ const PipelineBrowsing: FC = () => {
   // the changed pipeline without reloading the whole list or collapsing the open accordion.
   const refreshPipeline = useCallback(
     async (group: string, name: string) => {
-      const fresh = await getPipeline(group, name, () => { });
+      const fresh = await getPipeline(group, name, () => {});
       if (!fresh) return;
 
       queryClient.setQueryData<Pipeline[]>(['pipelines', group, 'details'], (prev = []) =>

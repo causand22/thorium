@@ -3,14 +3,7 @@ import Omnibar from './Omnibar';
 import { useTagCount, useTagKeyTotals } from '@utilities/tags';
 import { Clause, ClauseCondition } from './clauses/ClauseTypes';
 import { HashJump } from './clauses/hash';
-import {
-  addGroupOptions,
-  addIndexOptions,
-  addStringOption,
-  addTagOptions,
-  addTextOptions,
-  emptyRegistry,
-} from './clauses/options';
+import { addGroupOptions, addIndexOptions, addStringOption, addTagOptions, addTextOptions, emptyRegistry } from './clauses/options';
 import { OmnibarContext } from './settingsRegistry';
 import { OmnibarSettings } from './urlState';
 import { TimeSelection } from './timepicker/utils';

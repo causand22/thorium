@@ -96,9 +96,7 @@ export function mergeOrAppend(clauses: Clause[], clause: Clause, ctx: EditorCont
   const key = resolveKey(clause.field, clause.category === 'tag', ctx.registry, ctx.tagsCaseInsensitive);
   if (!key?.orCapable || !isMergeable(clause)) return appendUnlessDuplicate(clauses, clause);
 
-  const idx = clauses.findIndex(
-    (entry) => entry.category === clause.category && entry.field === clause.field && isMergeable(entry),
-  );
+  const idx = clauses.findIndex((entry) => entry.category === clause.category && entry.field === clause.field && isMergeable(entry));
   if (idx === -1) return appendUnlessDuplicate(clauses, clause);
 
   const values = Array.from(new Set([...clauseValues(clauses[idx]), ...clauseValues(clause)]));

@@ -245,9 +245,7 @@ function buildValueRows(state: BufferState): DropdownRow[] {
 
   if (rows.length === 0) {
     const label =
-      key.values.length === 0
-        ? `No known values for '${key.key}' — type a value, then Enter`
-        : `No values match '${state.valueDraft}'`;
+      key.values.length === 0 ? `No known values for '${key.key}' — type a value, then Enter` : `No values match '${state.valueDraft}'`;
     rows.push({ kind: 'hint', label });
   }
 

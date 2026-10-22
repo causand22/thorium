@@ -60,20 +60,7 @@ type AutoWidthInputProps = {
  * clause chips rather than as a form field.
  */
 export const AutoWidthInput = forwardRef<HTMLInputElement, AutoWidthInputProps>(
-  (
-    {
-      value,
-      placeholder,
-      autoFocus,
-      minWidth = 0,
-      onChange,
-      onKeyDown,
-      onFocus,
-      'aria-label': ariaLabel,
-      onMultiPaste,
-    },
-    ref,
-  ) => {
+  ({ value, placeholder, autoFocus, minWidth = 0, onChange, onKeyDown, onFocus, 'aria-label': ariaLabel, onMultiPaste }, ref) => {
     const measureRef = useRef<HTMLSpanElement | null>(null);
     const measureText = value || placeholder || ' ';
 

@@ -18,7 +18,7 @@ describe('toListParams', () => {
     expect('cursor' in toListParams({ limit: 25 }, cursor)).toBe(false);
   });
 
-  it('does not modify the caller\'s filters', () => {
+  it("does not modify the caller's filters", () => {
     const filters = { limit: 25, hideTags: ['Results'] };
     toListParams(filters, 'abc');
     expect(filters).toEqual({ limit: 25, hideTags: ['Results'] });

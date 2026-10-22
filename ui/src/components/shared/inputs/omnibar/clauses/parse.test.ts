@@ -1,14 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Clause, ClauseCondition } from './ClauseTypes';
-import {
-  clausesEqual,
-  OmnibarKey,
-  OmnibarRegistry,
-  parseBuffer,
-  resolveKey,
-  serializeClause,
-  symbolToCondition,
-} from './parse';
+import { clausesEqual, OmnibarKey, OmnibarRegistry, parseBuffer, resolveKey, serializeClause, symbolToCondition } from './parse';
 
 // spec: ../SPEC.md
 
@@ -54,7 +46,9 @@ function searchRegistry(): OmnibarRegistry {
 /** A registry shaped like the Scylla-backed browsing bar: no negation on tags, no free text. */
 function browsingRegistry(): OmnibarRegistry {
   return {
-    fields: [field('group', { values: ['static'], creatable: false, orCapable: true, conditions: [ClauseCondition.Is, ClauseCondition.IsOneOf] })],
+    fields: [
+      field('group', { values: ['static'], creatable: false, orCapable: true, conditions: [ClauseCondition.Is, ClauseCondition.IsOneOf] }),
+    ],
     tags: [tag('arch', ['x86'])],
     tagTemplate: { category: 'tag', conditions: [ClauseCondition.Is], orCapable: false },
   };

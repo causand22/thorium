@@ -30,7 +30,15 @@ function registry(): OmnibarRegistry {
       field('name', { conditions: [ClauseCondition.Includes, ClauseCondition.Is, ClauseCondition.IsNot] }),
     ],
     tags: [
-      { key: 'arch', kind: 'tag', category: 'tag', conditions: [ClauseCondition.Is], orCapable: false, creatable: true, values: ['arm', 'x86'] },
+      {
+        key: 'arch',
+        kind: 'tag',
+        category: 'tag',
+        conditions: [ClauseCondition.Is],
+        orCapable: false,
+        creatable: true,
+        values: ['arm', 'x86'],
+      },
     ],
     tagTemplate: { category: 'tag', conditions: [ClauseCondition.Is], orCapable: false },
     text: field('text', { category: 'text' }),
@@ -222,10 +230,7 @@ describe('chip editing', () => {
 
   it('replaces in place, preserving clause order', () => {
     const { clauses } = run([{ type: 'editChip', index: 0 }, type('group=beta'), enter], [groupAlpha, archArm]);
-    expect(clauses).toEqual([
-      { category: 'group', field: 'group', condition: ClauseCondition.Is, value: { value: 'beta' } },
-      archArm,
-    ]);
+    expect(clauses).toEqual([{ category: 'group', field: 'group', condition: ClauseCondition.Is, value: { value: 'beta' } }, archArm]);
   });
 
   it('leaves the chip untouched when the edit is abandoned', () => {
@@ -235,7 +240,13 @@ describe('chip editing', () => {
   });
 
   it('shifts the edit index when an earlier chip is deleted', () => {
-    const { state } = run([{ type: 'editChip', index: 1 }, { type: 'deleteChip', index: 0 }], [groupAlpha, archArm]);
+    const { state } = run(
+      [
+        { type: 'editChip', index: 1 },
+        { type: 'deleteChip', index: 0 },
+      ],
+      [groupAlpha, archArm],
+    );
     expect(state.editingIndex).toBe(0);
   });
 });
@@ -277,10 +288,7 @@ describe('pasteMulti', () => {
 
   it('treats a bare line as its own text clause alongside field lines', () => {
     const { clauses } = run([pasteMulti('malware\ngroup=alpha')]);
-    expect(clauses).toEqual([
-      { category: 'text', field: 'text', condition: ClauseCondition.Is, value: { value: 'malware' } },
-      groupAlpha,
-    ]);
+    expect(clauses).toEqual([{ category: 'text', field: 'text', condition: ClauseCondition.Is, value: { value: 'malware' } }, groupAlpha]);
   });
 
   it('applies the existing merge rules across pasted lines', () => {
@@ -378,9 +386,7 @@ describe('operator stage', () => {
 
   it('hands over to the value stage, which commits a negated clause', () => {
     const { clauses } = run([...pickRole, down, enter, type('role!=admin'), enter]);
-    expect(clauses).toEqual([
-      { category: 'role', field: 'role', condition: ClauseCondition.IsNot, value: { value: 'admin' } },
-    ]);
+    expect(clauses).toEqual([{ category: 'role', field: 'role', condition: ClauseCondition.IsNot, value: { value: 'admin' } }]);
   });
 
   it('steps back to the key stage on Escape, then clears on a second Escape', () => {
