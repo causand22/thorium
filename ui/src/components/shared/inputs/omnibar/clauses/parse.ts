@@ -19,10 +19,16 @@ import { Clause, ClauseCondition, ClauseIsMulti, CondIsMulti, NewTextClause } fr
 
 // spec: ../SPEC.md
 
-/** The prefix that forces a key to be read as a tag, shadowing any same-named reserved field. */
+/**
+ * The prefix that forces a key to be read as a tag.
+ *
+ * A reserved field always wins a bare name clash, so this is the only way to reach a tag key whose
+ * name a field has already taken — see {@link keyIsShadowed}, which names the same relationship from
+ * the field's side.
+ */
 export const TAG_PREFIX = 'tag:';
 
-/** Operator symbols, longest first so a greedy scan prefers `!=` over `=`. */
+/** Operator symbols, longest first. {@link findOperator} explains how an overlapping pair resolves. */
 export const OPERATORS = ['!=', '~', '='] as const;
 
 export type OperatorSymbol = (typeof OPERATORS)[number];
@@ -125,8 +131,13 @@ export function conditionToSymbol(condition: ClauseCondition): OperatorSymbol {
 }
 
 /**
- * Find the earliest operator in `buffer`. On an equal index the longer symbol wins, so `a!=b` reads as
- * `!=` rather than `=`.
+ * Find the operator that starts earliest in `buffer`; on a tie, the longer symbol wins.
+ *
+ * Position alone settles today's operators: `a!=b` reads as `!=` because the `!` sits one character
+ * left of the `=`, not because `!=` is longer. No two of `!=`, `~` and `=` can start at the same
+ * index, so the tie-break never fires as things stand. It is there for the obvious next operators —
+ * add `>` and `>=` and `a>=b` reports both at the same index, where picking the longer one is what
+ * stops `>=` being read as `>` followed by a value of `=b`.
  */
 export function findOperator(buffer: string): { symbol: OperatorSymbol; index: number } | undefined {
   let best: { symbol: OperatorSymbol; index: number } | undefined;
@@ -228,8 +239,14 @@ export function parseBuffer(buffer: string, registry: OmnibarRegistry, tagsCaseI
   const key = resolveKey(keyName, forcedTag, registry, tagsCaseInsensitive);
   const rawValue = buffer.slice(operator.index + operator.symbol.length);
 
-  // split the value for display purposes regardless of whether the key turns out to allow it, so the
-  // dropdown still has something sensible to filter on while the user is mid-typing
+  // Split on commas now, before any of the validation below. Every outcome is built from `state` —
+  // including the errors, via `fail` — so doing this first means a rejected buffer still carries a
+  // full account of what the user typed, and the dropdown keeps filtering instead of going blank.
+  // Three different jobs come out of the one split:
+  //   valueDraft      the segment after the last comma: what the user is typing now, and what the
+  //                   dropdown filters its value list by
+  //   committedValues the segments before it: already-entered values, shown with checkmarks
+  //   values          both together, minus empties: the values a successful parse puts on the clause
   const segments = rawValue.split(',');
   const valueDraft = segments[segments.length - 1];
   const committedValues = segments.slice(0, -1).filter((segment) => segment !== '');
