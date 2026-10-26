@@ -240,7 +240,8 @@ export function paramsToSettings(params: URLSearchParams, defaultSettings: Omnib
   const limit = parsedLimit > 0 ? clampLimit(parsedLimit) : defaultSettings.limit;
 
   const caseParam = params.get('caseInsensitive');
-  const tagsCaseInsensitive = caseParam === null ? defaultSettings.tagsCaseInsensitive : caseParam === '1';
+  // only the two values `settingsToParams` writes are meaningful; anything else is a mangled link
+  const tagsCaseInsensitive = caseParam === '1' ? true : caseParam === '0' ? false : defaultSettings.tagsCaseInsensitive;
 
   // preserve default hidden-tag filtering when the URL is silent — but not when the user explicitly
   // cleared it (`nohide` sentinel)

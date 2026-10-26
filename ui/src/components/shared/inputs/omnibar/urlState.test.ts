@@ -244,6 +244,12 @@ describe('settings url round-trips', () => {
     expect(paramsToSettings(params, defaults)).toEqual({ ...defaults, tagsCaseInsensitive: !defaults.tagsCaseInsensitive });
   });
 
+  it.each(['', 'yes', 'true', '2'])('falls back to the default for caseInsensitive=%j', (value) => {
+    const defaults = defaultOmnibarSettings();
+    const decoded = paramsToSettings(new URLSearchParams({ caseInsensitive: value }), defaults);
+    expect(decoded.tagsCaseInsensitive).toBe(defaults.tagsCaseInsensitive);
+  });
+
   it('falls back to defaults for an unparseable limit', () => {
     const defaults = defaultOmnibarSettings();
     expect(paramsToSettings(new URLSearchParams('limit=abc'), defaults)).toEqual(defaults);
