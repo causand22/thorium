@@ -63,6 +63,16 @@ describe('clause url round-trips', () => {
     expect(paramsToClauses(params)).toEqual(clauses);
   });
 
+  // repeated `tags[KEY]` params decode as separate clauses, which the backend intersects, so an `IsOneOf`
+  // tag must not be written that way or "a or b" would come back as "a and b"
+  it('routes a multi-value tag through the generic fallback rather than repeated tags[KEY]', () => {
+    const clauses = [multi('tag', 'arch', ['x86', 'arm'])];
+    const params = clausesAndTimeToParams(clauses, { mode: 'all' });
+    expect(params.getAll('c')).toHaveLength(1);
+    expect(params.getAll('tags[arch]')).toEqual([]);
+    expect(paramsToClauses(params)).toEqual(clauses);
+  });
+
   it('routes a substring clause through the generic fallback', () => {
     const clauses = [single('name', 'name', 'unpack', ClauseCondition.Includes)];
     expect(roundTripClauses(clauses)).toEqual(clauses);
