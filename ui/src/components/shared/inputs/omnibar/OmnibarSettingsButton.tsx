@@ -5,8 +5,6 @@ import { FaGear } from 'react-icons/fa6';
 import { commitSettings, OmnibarContext, settingsForContext } from './settingsRegistry';
 import { OmnibarSettings } from './urlState';
 
-// spec: ./SPEC.md
-
 const SettingsButton = styled.button`
   border-radius: 5px;
   background-color: var(--thorium-omnibar-bg);
@@ -55,7 +53,7 @@ type OmnibarSettingsButtonProps = {
  * the settings registry, filtered to `context`; renders nothing when no setting applies there.
  *
  * Hidden tags live in settings rather than as a clause because they filter what is *rendered*, not
- * what is *queried*, and so have no `key <operator> value` form (SPEC §10).
+ * what is *queried*, and so have no `key <operator> value` form.
  */
 const OmnibarSettingsButton: React.FC<OmnibarSettingsButtonProps> = ({ settings, setSettings, context, tagKeyOptions }) => {
   const [draft, setDraft] = useState<OmnibarSettings>(settings);

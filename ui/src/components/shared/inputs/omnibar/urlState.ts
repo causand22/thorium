@@ -16,13 +16,11 @@ import { Clause, ClauseCondition, clauseValues, CondIsMulti, NewTextClause, pars
 import { RelativeUnit, TimeSelection } from './timepicker/utils';
 import type { ParamCodec } from '@utilities/url/codecs';
 
-// spec: ./SPEC.md
-
 /**
  * Request-shaping settings independent of any single clause.
  *
  * `hiddenTags` lives here rather than in a clause because it has no `key <operator> value` form: it is
- * a display filter over which tag keys are rendered, not a query filter (SPEC §10).
+ * a display filter over which tag keys are rendered, not a query filter.
  */
 export type OmnibarSettings = { tagsCaseInsensitive: boolean; limit: number; hiddenTags: string[] };
 

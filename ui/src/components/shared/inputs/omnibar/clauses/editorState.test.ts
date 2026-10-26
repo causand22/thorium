@@ -3,8 +3,6 @@ import { Clause, ClauseCondition } from './ClauseTypes';
 import { EditorAction, EditorContext, EditorState, initialEditorState, mergeOrAppend, reduceEditor } from './editorState';
 import { OmnibarKey, OmnibarRegistry } from './parse';
 
-// spec: ../SPEC.md
-
 function field(key: string, over: Partial<OmnibarKey> = {}): OmnibarKey {
   return { key, kind: 'field', category: key, conditions: [ClauseCondition.Is], orCapable: false, creatable: true, values: [], ...over };
 }

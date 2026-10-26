@@ -9,8 +9,6 @@
 // project imports
 import { isValidSha256 } from '@utilities/files';
 
-// spec: ../SPEC.md
-
 /**
  * What a page supplies to enable the hash jump on its omnibar. Bars without one are unchanged.
  *

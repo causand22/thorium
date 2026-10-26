@@ -4,8 +4,6 @@ import LimitControl from './settingsControls/LimitControl';
 import { SettingControlProps } from './settingsControls/types';
 import { OmnibarSettings } from './urlState';
 
-// spec: ./SPEC.md
-
 /**
  * Where an omnibar is being used. Each setting declares the contexts it applies to, and the settings
  * popover only shows (and the page only honors) the settings that apply to the current one.

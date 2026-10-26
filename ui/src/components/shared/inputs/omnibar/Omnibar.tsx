@@ -9,8 +9,6 @@ import { TimeSelection } from './timepicker/utils';
 import { OmnibarContext, settingApplies } from './settingsRegistry';
 import { OmnibarSettings } from './urlState';
 
-// spec: ./SPEC.md
-
 const OmnibarWrapperContainer = styled.div`
   max-width: 1000px;
   width: 100%;

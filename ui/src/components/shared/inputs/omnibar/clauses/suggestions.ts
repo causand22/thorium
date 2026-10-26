@@ -19,8 +19,6 @@ import {
   TAG_PREFIX,
 } from './parse';
 
-// spec: ../SPEC.md
-
 /** A non-selectable section divider. */
 export type HeaderRow = { kind: 'header'; label: string };
 /** A non-selectable hint, e.g. "No known values for 'foo'". */

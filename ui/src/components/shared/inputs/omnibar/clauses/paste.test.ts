@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { sanitizePastedText, splitPastedSegments } from './paste';
 
-// spec: ../SPEC.md
-
 describe('sanitizePastedText', () => {
   it('trims a leading space before a key', () => {
     expect(sanitizePastedText(' group=test1')).toBe('group=test1');

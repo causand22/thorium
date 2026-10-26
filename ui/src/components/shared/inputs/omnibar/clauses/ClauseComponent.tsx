@@ -2,8 +2,6 @@ import { useRef, useLayoutEffect, ClipboardEvent, KeyboardEvent, forwardRef } fr
 import { styled } from 'styled-components';
 import { sanitizePastedText, splitPastedSegments } from './paste';
 
-// spec: ../SPEC.md
-
 export const ClauseComponentSpan = styled.span`
   margin: 0 2px;
   white-space: pre;

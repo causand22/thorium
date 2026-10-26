@@ -13,8 +13,6 @@ import { Pipeline } from '@models/pipelines';
 import { Image } from '@models/images';
 import { RoleKey, UserInfo } from '@models/users';
 
-// spec: ./SPEC.md
-
 /**
  * Conditions available to a key the page filters itself, in the browser. These pages hold the whole
  * list in memory, so unlike the Scylla-backed bars they can negate and substring-match freely.

@@ -12,8 +12,6 @@ import {
   ENTITY_LAYER_KEYS,
 } from './options';
 
-// spec: ../SPEC.md
-
 const keyNames = (keys: { key: string }[]) => keys.map((entry) => entry.key).sort();
 
 describe('addEntityLayerOptions', () => {

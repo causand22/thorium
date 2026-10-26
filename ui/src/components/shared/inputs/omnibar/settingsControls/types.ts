@@ -1,7 +1,5 @@
 import { OmnibarSettings } from '../urlState';
 
-// spec: ../SPEC.md
-
 export type SettingControlProps = {
   /** The popover's in-progress (uncommitted) settings. */
   draft: OmnibarSettings;

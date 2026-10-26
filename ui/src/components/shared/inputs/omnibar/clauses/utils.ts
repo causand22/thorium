@@ -15,8 +15,6 @@ import { getTagColorClass } from '@components/tags';
 import { ElasticIndex } from '@models/search';
 import { RequestTags } from '@models/tags';
 
-// spec: ../SPEC.md
-
 /** The free-text clause, as built by `NewTextClause`. A tag keyed `text` is a tag, not free text. */
 function isTextClause(clause: Clause): boolean {
   return clause.category === 'text' && clause.field === 'text';

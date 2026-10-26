@@ -3,8 +3,8 @@
  * a leading space, a trailing newline, spaces after commas in a copied list — that would otherwise
  * stop a key from matching a reserved field (`resolveKey` in `./parse` does not trim) or end up
  * baked into a value. This is deliberately *not* part of the core grammar in `./parse`: typed input
- * keeps the exact verbatim semantics documented in `../SPEC.md`, and this file only cleans up text
- * on the way in from the clipboard before handing it to that unchanged parser.
+ * keeps the exact verbatim semantics (nothing is trimmed), and this file only cleans up text on the way
+ * in from the clipboard before handing it to that unchanged parser.
  */
 
 // project imports

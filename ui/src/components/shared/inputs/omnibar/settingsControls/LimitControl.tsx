@@ -4,8 +4,6 @@ import { clampLimit, defaultOmnibarSettings, MAX_LIMIT } from '../urlState';
 import { SettingsRow } from './styles';
 import { SettingControlProps } from './types';
 
-// spec: ../SPEC.md
-
 /**
  * Parse the limit field. Returns the clamped limit, the default for an empty field, or `undefined`
  * for input that is not a usable number (the draft is then left unchanged).

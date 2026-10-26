@@ -2,8 +2,6 @@ import { Form } from 'react-bootstrap';
 import { SettingsRow } from './styles';
 import { SettingControlProps } from './types';
 
-// spec: ../SPEC.md
-
 const CaseInsensitiveControl: React.FC<SettingControlProps> = ({ draft, update }) => (
   <SettingsRow>
     <Form.Label htmlFor="omnibar-settings-case-insensitive" className="m-0">

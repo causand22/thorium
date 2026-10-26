@@ -12,8 +12,6 @@ import {
   parseClauseCondition,
 } from './ClauseTypes';
 
-// spec: ../SPEC.md
-
 describe('DEFAULT_HIDDEN_TAGS', () => {
   it('hides the Results/Parent/submitter tags by default', () => {
     expect(DEFAULT_HIDDEN_TAGS).toEqual(['Results', 'Parent', 'submitter']);

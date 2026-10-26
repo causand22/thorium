@@ -10,8 +10,6 @@ import { OmnibarRegistry, parseBuffer, serializeClause } from './parse';
 import { buildRows, DropdownRow } from './suggestions';
 import { useHashLookup } from './useHashLookup';
 
-// spec: ../SPEC.md
-
 const ClauseEditorContainer = styled.div`
   width: 100%;
   position: relative;

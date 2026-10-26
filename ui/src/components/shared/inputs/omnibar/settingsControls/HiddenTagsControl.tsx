@@ -3,8 +3,6 @@ import { Form } from 'react-bootstrap';
 import { styled } from 'styled-components';
 import { SettingControlProps } from './types';
 
-// spec: ../SPEC.md
-
 const SectionLabel = styled.div`
   margin-bottom: 6px;
 `;

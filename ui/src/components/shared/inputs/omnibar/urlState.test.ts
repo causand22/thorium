@@ -128,7 +128,7 @@ describe('clause decoding', () => {
 });
 
 // hidden tags moved from the clause codec to the settings codec, but keep the same param names so
-// existing shared links keep resolving (SPEC §10, §12)
+// existing shared links keep resolving
 describe('hidden tags (settings codec, nohide sentinel)', () => {
   it('emits hide params for a non-default set', () => {
     const params = new URLSearchParams();

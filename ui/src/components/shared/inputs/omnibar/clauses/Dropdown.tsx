@@ -4,8 +4,6 @@ import { FaCheck } from 'react-icons/fa';
 import { CategoryLogo } from './CategoryLogo';
 import { DropdownRow, rowIsSelectable } from './suggestions';
 
-// spec: ../SPEC.md
-
 const OmnibarDropdownDiv = styled.div`
   position: absolute;
   border: 1px solid var(--thorium-omnibar-border);

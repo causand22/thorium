@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { HashJump } from './hash';
 
-// spec: ../SPEC.md
-
 export type HashLookup = {
   /** The sha256 being looked up, or `null` when no lookup is running. */
   lookingUp: string | null;

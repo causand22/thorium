@@ -15,8 +15,6 @@ import {
 import { Clause, ClauseCondition } from './ClauseTypes';
 import { ElasticIndex } from '@models/search';
 
-// spec: ../SPEC.md
-
 // helpers to build clauses without repeating the discriminated-union boilerplate
 function single(category: string, field: string, value: string): Clause {
   return { category, field, condition: ClauseCondition.Is, value: { value } };

@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { asBareSha256 } from './hash';
 
-// spec: ../SPEC.md
-
 const HASH = 'a'.repeat(32) + 'B'.repeat(32);
 
 describe('asBareSha256', () => {

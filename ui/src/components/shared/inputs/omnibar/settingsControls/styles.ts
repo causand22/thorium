@@ -1,7 +1,5 @@
 import { styled } from 'styled-components';
 
-// spec: ../SPEC.md
-
 /** A label on the left and its control on the right. */
 export const SettingsRow = styled.div`
   display: flex;

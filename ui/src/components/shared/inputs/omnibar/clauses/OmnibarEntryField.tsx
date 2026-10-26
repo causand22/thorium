@@ -4,8 +4,6 @@ import { OmnibarClause } from './Clause';
 import { AutoWidthInput } from './ClauseComponent';
 import { Clause } from './ClauseTypes';
 
-// spec: ../SPEC.md
-
 const OmnibarEntryFieldDiv = styled.div<{ $dropdownVisible: boolean; $timepickerVisible: boolean; $invalid: boolean }>`
   border: 1px solid ${({ $invalid }) => ($invalid ? 'var(--thorium-danger, #c0392b)' : 'var(--thorium-omnibar-border)')};
   color: var(--thorium-text);

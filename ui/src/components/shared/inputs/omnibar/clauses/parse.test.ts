@@ -2,8 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { Clause, ClauseCondition } from './ClauseTypes';
 import { clausesEqual, OmnibarKey, OmnibarRegistry, parseBuffer, resolveKey, serializeClause, symbolToCondition } from './parse';
 
-// spec: ../SPEC.md
-
 // ---- fixtures -----------------------------------------------------------------------------------
 
 function field(key: string, over: Partial<OmnibarKey> = {}): OmnibarKey {

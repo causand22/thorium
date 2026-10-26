@@ -4,15 +4,13 @@
  * Each page composes its own {@link OmnibarRegistry} from these builders, because the three backends
  * behind the omnibar have different capabilities: the Elastic search route can negate, the Scylla list
  * routes can only intersect, and the pages that filter an already-loaded list client-side can do
- * anything. That difference is expressed per key through `conditions` and `orCapable` — see SPEC §6.
+ * anything. That difference is expressed per key through `conditions` and `orCapable`.
  */
 
 // project imports
 import { TagOptions } from '@models/tags';
 import { ClauseCondition } from './ClauseTypes';
 import { OmnibarKey, OmnibarRegistry } from './parse';
-
-// spec: ../SPEC.md
 
 export type { OmnibarKey, OmnibarRegistry } from './parse';
 
@@ -127,7 +125,7 @@ export function addTextOptions(registry: OmnibarRegistry): OmnibarRegistry {
 }
 
 type TagSpec = {
-  /** Whether tags can be negated here. Only true on Elastic-backed bars (SPEC §6). */
+  /** Whether tags can be negated here. Only true on Elastic-backed bars; the Scylla list routes can only intersect. */
   negatable?: boolean;
   /** Per-key document totals, used to rank the dropdown's Tags section. */
   keyTotals?: Record<string, number>;

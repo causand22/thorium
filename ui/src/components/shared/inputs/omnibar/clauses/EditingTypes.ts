@@ -1,5 +1,3 @@
-// spec: ../SPEC.md
-
 /** The keys the omnibar handles itself; everything else falls through to the input. */
 export enum KeyName {
   Enter = 'Enter',

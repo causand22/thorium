@@ -1,5 +1,3 @@
-// spec: ../SPEC.md
-
 /* Package for clause data and all clause related functions.
  *
  * A clause is always `key <operator> value`, including free text (`category`/`field` both `'text'`).

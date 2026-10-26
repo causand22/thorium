@@ -7,8 +7,6 @@ import { Clause, GetValueString } from './ClauseTypes';
 import { conditionToSymbol } from './parse';
 import { CategoryLogo } from './CategoryLogo';
 
-// spec: ../SPEC.md
-
 const IconButton = styled.button`
   padding: 0;
   border: 0px;

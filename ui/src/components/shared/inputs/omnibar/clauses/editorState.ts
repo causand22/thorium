@@ -22,8 +22,6 @@ import {
   stepSelectable,
 } from './suggestions';
 
-// spec: ../SPEC.md
-
 export type EditorState = {
   /** The in-progress clause text. */
   buffer: string;
@@ -88,7 +86,7 @@ function appendUnlessDuplicate(clauses: Clause[], clause: Clause): Clause[] {
  * Add `clause` to the list, folding it into an existing chip for the same key when that key is
  * or-capable and both chips use `=`. Anything else appends — a different operator, or a key that
  * isn't or-capable: two values for one tag key genuinely AND on the Scylla routes, so two chips is
- * the honest rendering (see SPEC §7). An exact duplicate of an existing chip is dropped.
+ * the honest rendering. An exact duplicate of an existing chip is dropped.
  */
 export function mergeOrAppend(clauses: Clause[], clause: Clause, ctx: EditorContext): Clause[] {
   if (clause.category === 'text') return appendUnlessDuplicate(clauses, clause);
@@ -146,7 +144,7 @@ function commitBuffer(state: EditorState, ctx: EditorContext): EditorResult {
 
 /**
  * Commit every segment of a multi-line paste that parses into a clause, in paste order, applying the
- * same merge/dedup rules as a single Enter (§7 via {@link mergeOrAppend}). A segment that doesn't
+ * same merge/dedup rules as a single Enter (see {@link mergeOrAppend}). A segment that doesn't
  * resolve — a `ParseError` or an `Incomplete` bare word — is kept rather than dropped: the single-line
  * buffer can't render several leftover lines separately, so they're joined with `" | "` for the user to
  * see and fix, instead of silently vanishing the way an `Incomplete` typed buffer normally would.

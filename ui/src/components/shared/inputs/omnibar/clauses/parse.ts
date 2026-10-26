@@ -2,12 +2,15 @@
  * The omnibar grammar: turning the text buffer into a {@link Clause} and back.
  *
  * The buffer holds exactly one in-progress clause, so the value is simply "the rest of the buffer" —
- * no quoting is needed for spaces and there are no escape sequences anywhere in the grammar. See
- * `../SPEC.md` for the full specification; the short version is:
+ * no quoting is needed for spaces and there are no escape sequences anywhere in the grammar.
  *
  *     "…"              -> text clause, one outer quote pair stripped
  *     <no operator>    -> text clause, verbatim
  *     [tag:]key OP val -> field or tag clause, OP being `=`, `!=` or `~`
+ *
+ * Further rules: an operator with nothing before it (`=foo`) is free text; `tag:` forces the key to be
+ * read as a tag; `=` with several comma-separated values means "is one of", while `!=` and `~` take a
+ * single value; and an operator outside the key's `conditions` is a parse error.
  *
  * {@link parseBuffer} is the single source of truth for the editor: it drives the dropdown (via
  * `stage`/`keyDraft`/`valueDraft`) *and* the commit (via `result`), so there is no second
@@ -16,8 +19,6 @@
 
 // project imports
 import { Clause, ClauseCondition, ClauseIsMulti, CondIsMulti, NewTextClause } from './ClauseTypes';
-
-// spec: ../SPEC.md
 
 /**
  * The prefix that forces a key to be read as a tag.
@@ -45,7 +46,10 @@ export type OmnibarKey = {
   category: string;
   /** Operators this key accepts **on this bar**; an operator outside this list is a parse error. */
   conditions: ClauseCondition[];
-  /** Whether the backend ORs comma-separated values for this key (see SPEC §6). */
+  /**
+   * Whether the backend ORs comma-separated values for this key. Where it doesn't (e.g. tag keys on the
+   * Scylla list routes, which AND them), values for one key must stay separate chips.
+   */
   orCapable: boolean;
   /** Whether a value outside {@link values} is accepted. `false` means a closed enumeration. */
   creatable: boolean;

@@ -3,8 +3,6 @@ import { ClauseCondition } from './ClauseTypes';
 import { OmnibarKey, OmnibarRegistry, parseBuffer } from './parse';
 import { buildRows, ChoiceRow, operatorStageActiveRow, PendingKey, rowIsSelectable } from './suggestions';
 
-// spec: ../SPEC.md
-
 function field(key: string, over: Partial<OmnibarKey> = {}): OmnibarKey {
   return { key, kind: 'field', category: key, conditions: [ClauseCondition.Is], orCapable: false, creatable: true, values: [], ...over };
 }

@@ -7,8 +7,6 @@ import { HashJump } from './clauses/hash';
 import { getFileDetails } from '@thorpi/files';
 import { queryKeys } from '@thorpi/queryKeys';
 
-// spec: ./SPEC.md
-
 /**
  * The page-side half of the omnibar's hash jump: look a sha256 up, then open its file page.
  *
