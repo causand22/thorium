@@ -40,8 +40,28 @@ const FILE_TABS: TabItem[] = [
 // hash-deep-link keys are exactly the file tab keys, so derive them to avoid drift
 const ValidTabs = FILE_TABS.map((t) => t.key);
 
+// one card holding the tab bar and the active section, so the tabs read as attached to their content
+const TabCard = styled.div`
+  background: var(--thorium-panel-bg);
+  border: 1px solid var(--thorium-panel-border);
+  border-radius: 6px;
+`;
+
+// the tab list's divider spans the full card width while its tabs stay inset
+const TabBar = styled.div`
+  padding-top: 4px;
+
+  > * {
+    padding: 0 8px;
+  }
+`;
+
+// cards nested inside the tab card would blend into it, so they fall back to the body tone: every
+// .panel / table / BrowsingCard reads --thorium-panel-bg, so redefining it here restyles them all
 const TabPanels = styled.div`
   width: 100%;
+  padding: 16px;
+  --thorium-panel-bg: var(--thorium-body-bg);
 `;
 
 // panels stay mounted (only toggled via display:none) so lazy children and their inView gating are preserved across tab switches
@@ -189,34 +209,36 @@ const FileDetails = () => {
         setDeletionStatus={setDeletionStatus}
         onNavigateTab={jumpToTab}
       />
-      <div ref={tabsRef}>
-        <Tabs tabs={FILE_TABS} active={activeTab} onChange={handleTabChange} aria-label="File details sections" className="mt-4" />
-      </div>
-      <GraphDataProvider initial={associationInitial}>
-        <TabPanels className="mt-4">
-          <TabPanel $active={activeTab === 'results'}>
-            <Results sha256={sha256!} results={results} isLoading={resultsIsLoading} allowHashUpdate={allowResultsHashUpdate} />
-          </TabPanel>
-          <TabPanel $active={activeTab === 'entities'}>
-            <FileEntities sha256={sha256!} inView={entitiesTabSelected} />
-          </TabPanel>
-          <TabPanel $active={activeTab === 'associations'}>
-            <AssociationGraph inView={viewGraph} />
-          </TabPanel>
-          <TabPanel $active={activeTab === 'runpipelines'}>
-            <RunPipelines sha256={sha256!} />
-          </TabPanel>
-          <TabPanel $active={activeTab === 'comments'}>
-            <Comments sha256={sha256!} />
-          </TabPanel>
-          <TabPanel $active={activeTab === 'reactionstatus'}>
-            <ReactionStatus sha256={sha256!} autoRefresh={reactionsTabSelected} />
-          </TabPanel>
-          <TabPanel $active={activeTab === 'download'}>
-            <Download sha256={sha256!} />
-          </TabPanel>
-        </TabPanels>
-      </GraphDataProvider>
+      <TabCard className="mt-4">
+        <TabBar ref={tabsRef}>
+          <Tabs tabs={FILE_TABS} active={activeTab} onChange={handleTabChange} aria-label="File details sections" />
+        </TabBar>
+        <GraphDataProvider initial={associationInitial}>
+          <TabPanels>
+            <TabPanel $active={activeTab === 'results'}>
+              <Results sha256={sha256!} results={results} isLoading={resultsIsLoading} allowHashUpdate={allowResultsHashUpdate} />
+            </TabPanel>
+            <TabPanel $active={activeTab === 'entities'}>
+              <FileEntities sha256={sha256!} inView={entitiesTabSelected} />
+            </TabPanel>
+            <TabPanel $active={activeTab === 'associations'}>
+              <AssociationGraph inView={viewGraph} />
+            </TabPanel>
+            <TabPanel $active={activeTab === 'runpipelines'}>
+              <RunPipelines sha256={sha256!} />
+            </TabPanel>
+            <TabPanel $active={activeTab === 'comments'}>
+              <Comments sha256={sha256!} />
+            </TabPanel>
+            <TabPanel $active={activeTab === 'reactionstatus'}>
+              <ReactionStatus sha256={sha256!} autoRefresh={reactionsTabSelected} />
+            </TabPanel>
+            <TabPanel $active={activeTab === 'download'}>
+              <Download sha256={sha256!} />
+            </TabPanel>
+          </TabPanels>
+        </GraphDataProvider>
+      </TabCard>
     </Page>
   );
 };

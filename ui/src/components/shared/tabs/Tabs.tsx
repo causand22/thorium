@@ -12,16 +12,7 @@ const TabList = styled.div<{ $flush: boolean }>`
   display: flex;
   align-items: stretch;
   gap: 2px;
-  /* a non-flush bar sits on the page body, so it gets its own panel surface to match the cards below it */
-  ${({ $flush }) =>
-    $flush
-      ? ''
-      : `
-    padding: 4px 4px 0;
-    background: var(--thorium-panel-bg);
-    border: 1px solid var(--thorium-panel-border);
-    border-radius: 6px;
-  `}
+  border-bottom: ${({ $flush }) => ($flush ? 'none' : '1px solid var(--thorium-panel-border)')};
   flex-wrap: wrap;
 `;
 
