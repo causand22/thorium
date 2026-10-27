@@ -55,7 +55,8 @@ $grid-breakpoints: (
 
 .results-container {
   display: grid;
-  grid-template-columns: 3fr 1fr;
+  // minmax(0, …) stops wide result content from stretching the column past the container
+  grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
 }
 
 .results-toc-col {
@@ -115,7 +116,7 @@ $grid-breakpoints: (
   }
   .results-container {
     display: grid;
-    grid-template-columns: 3fr 0fr;
+    grid-template-columns: minmax(0, 3fr) 0;
   }
 }
 
