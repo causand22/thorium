@@ -62,6 +62,11 @@ const highlightResult = (result: string) => {
   return parse(`${clean}`);
 };
 
+const Panel = styled.div.attrs({ className: 'card panel' })`
+  color: var(--thorium-text);
+  margin-top: 2px;
+`
+
 const Name = styled(Col)`
   white-space: pre-wrap;
   text-align: center;
@@ -91,6 +96,10 @@ const Index = styled(Col)`
   }
 `;
 
+const Highlights = styled.div`
+  padding: 4px 8px;
+`
+
 const SearchResultsHeaders = () => {
   return (
     <Card className="panel">
@@ -111,31 +120,33 @@ interface SearchResultItemProps {
 }
 
 const SearchResultItem: React.FC<SearchResultItemProps> = ({ result, idx }) => {
+
+  const highlightKeys = result.highlight ? Object.keys(result.highlight).filter((key) => key != 'group') : [];
   return (
-    <Card className="panel">
-      <Row>
+    <Panel>
+      <Row className='pt-2'>
         {/* add common relative spacing for sha, group, and index*/}
         <Name>
           <Link to={`/file/${getSha256(result.id)}`}>{getSha256(result.id)}</Link>
         </Name>
         <Groups>{getGroup(result.id)}</Groups>
         <Index>{mapFullIndexName(result.index)}</Index>
-        <hr />
       </Row>
-      {result.highlight &&
-        Object.keys(result.highlight).map(
-          (key) =>
-            key !== 'group' && (
-              <Row key={`${getSha256(result.id)}_${idx}_${key}`}>
-                <Col>
-                  <span>
-                    {key}: {highlightResult(String(result.highlight?.[key]))}
-                  </span>
-                </Col>
-              </Row>
-            ),
-        )}
-    </Card>
+      <hr style={{ margin: 5 }} />
+      {highlightKeys.length > 0 && (
+        <Highlights>
+          {highlightKeys.map((key) => (
+            <Row key={`${getSha256(result.id)}_${idx}_${key}`}>
+              <Col>
+                <span>
+                  {key}: {highlightResult(String(result.highlight?.[key]))}
+                </span>
+              </Col>
+            </Row>
+          ))}
+        </Highlights>
+      )}
+    </Panel>
   );
 };
 
