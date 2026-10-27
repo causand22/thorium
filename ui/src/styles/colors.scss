@@ -325,7 +325,8 @@ $snl-black-0: tint($snl-black, 25%);
 
 [theme='Light'] {
   // Body
-  --thorium-body-bg: #{$snl-white};
+  // tinted so white panels stand out from the page
+  --thorium-body-bg: #{$snl-blue-grey-50};
   // Text
   --thorium-text: #{$snl-black-800};
   --thorium-secondary-text: #{$snl-grey-600};
@@ -341,7 +342,7 @@ $snl-black-0: tint($snl-black, 25%);
   --thorium-highlight-panel-bg: #{$snl-grey-200};
   --thorium-nav-panel-bg: #{$snl-dark-blue-700};
   // Borders
-  --thorium-panel-border: #{$snl-grey-300};
+  --thorium-panel-border: #{$snl-blue-grey-300};
   --thorium-highlight-panel-border: #{$snl-grey-100};
   --thorium-divider: #{$snl-grey-300};
   //Scrollbars
@@ -459,12 +460,12 @@ $snl-black-0: tint($snl-black, 25%);
   --thorium-link-text: #{$snl-medium-blue-600};
   --thorium-link-text-alt: #{$snl-medium-blue-800};
   // Panels — warm cream cards on sandy body, muted amber nav
-  --thorium-panel-bg: #faecd4;
+  --thorium-panel-bg: #fffaf0;
   --thorium-secondary-panel-bg: #eedcb8;
   --thorium-highlight-panel-bg: #e4cfa6;
   --thorium-nav-panel-bg: #{$snl-amber};
   // Borders
-  --thorium-panel-border: #{$snl-warm-grey-200};
+  --thorium-panel-border: #{$snl-warm-grey-300};
   --thorium-highlight-panel-border: #{$snl-warm-grey-100};
   --thorium-divider: #{$snl-warm-grey-200};
   // Omnibar
